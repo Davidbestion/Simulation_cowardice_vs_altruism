@@ -241,19 +241,28 @@ class Simulation:
 
     # ---- Métodos privados ----------------------------------------
 
-    def _assign_to_trees(self) -> List[Tuple[bool, List[Creature]]]:
+    def _assign_to_trees(self) -> Tuple[List[Tuple[bool, List[Creature]]], int]:
         """
-        Mezcla la población y agrupa criaturas por árbol.
+        Mezcla la población, llena los árboles y devuelve las criaturas
+        que no encontraron árbol libre (mueren de hambre).
 
-        Cada grupo (de 1 o 2 criaturas) se asigna a un árbol elegido
-        aleatoriamente. Los árboles con depredador se seleccionan
-        sin reemplazo al inicio del día.
+        Cada árbol admite EXACTAMENTE 2 criaturas por día. Si hay más
+        criaturas que `num_trees × 2`, el exceso no puede alimentarse
+        ni reproducirse (muere). Este límite es la capacidad de carga
+        natural del entorno; no hace falta un cap artificial.
 
         Returns:
-            Lista de tuplas (tiene_depredador, [criaturas_en_el_árbol]).
+            Tupla (assignments, starved) donde:
+            - assignments: lista de (tiene_depredador, [criaturas_en_el_árbol])
+            - starved:     número de criaturas que no encontraron árbol
         """
+        total_capacity = self.config.num_trees * 2
         shuffled = list(self.creatures)
         random.shuffle(shuffled)
+
+        assigned = shuffled[:total_capacity]          # caben en árboles
+        starved  = len(shuffled) - len(assigned)      # sin árbol → mueren
+
         predator_set = set(
             random.sample(
                 range(self.config.num_trees),
@@ -261,11 +270,11 @@ class Simulation:
             )
         )
         assignments: List[Tuple[bool, List[Creature]]] = []
-        for i in range(0, len(shuffled), 2):
-            group    = shuffled[i : i + 2]
-            tree_idx = random.randint(0, self.config.num_trees - 1)
+        for i in range(0, len(assigned), 2):
+            group    = assigned[i : i + 2]
+            tree_idx = i // 2          # par 0 → árbol 0, par 1 → árbol 1, ...
             assignments.append((tree_idx in predator_set, group))
-        return assignments
+        return assignments, starved
 
     def _reproduce(
         self,
@@ -274,33 +283,27 @@ class Simulation:
         """
         Genera la nueva generación a partir de los sobrevivientes.
 
-        Cada sobreviviente genera hijos llamando a su método `reproduce()`.
-        La implementación de `Creature.reproduce()` crea 1 o 2 descendientes
-        idénticos al progenitor. Tanto el progenitor como sus hijos forman
-        parte de la nueva generación. Si la población supera
-        max_population, se aplica muestreo aleatorio (selección neutral).
+        Cada criatura sobreviviente llama a reproduce() (1 o 2 hijos idénticos)
+        y luego MUERE: la nueva generación está formada ÚNICAMENTE por los hijos.
+        El progenitor no se incluye en la siguiente ronda.
+
+        Ciclo real: criatura sale → posible muerte por depredador → las que
+        sobreviven regresan a casa, dejan 1 o 2 hijos y desaparecen.
 
         Args:
-            survivors: Criaturas que sobrevivieron el día.
+            survivors: Criaturas que sobrevivieron el encuentro con depredadores.
 
         Returns:
-            Tupla (nueva_población_completa, cantidad_de_nacimientos).
+            Tupla (nueva_población, nacimientos).
         """
         offspring: List[Creature] = []
         for creature in survivors:
-            new_children = creature.reproduce()
-            # Compatibilidad: si reproduce() devuelve una única criatura,
-            # la envolvemos en una lista; de lo contrario extendemos.
-            if isinstance(new_children, list):
-                offspring.extend(new_children)
-            else:
-                offspring.append(new_children)
-        full_pop = survivors + offspring
-        births   = len(offspring)
-        if self.config.max_population and len(full_pop) > self.config.max_population:
-            random.shuffle(full_pop)
-            full_pop = full_pop[: self.config.max_population]
-        return full_pop, births
+            offspring.extend(creature.reproduce())  # padre muere; quedan 1 o 2 hijos
+        births = len(offspring)
+        if self.config.max_population and births > self.config.max_population:
+            random.shuffle(offspring)
+            offspring = offspring[: self.config.max_population]
+        return offspring, births
 
     def _collect_stats(self, day: int, deaths: int, births: int) -> DayStats:
         """
@@ -342,13 +345,19 @@ class Simulation:
         """
         Ejecuta un día completo de la simulación.
 
+        Ciclo:
+          1. Criaturas salen a buscar árbol (capacidad: 2 por árbol).
+          2. Las que no encuentran árbol mueren de hambre.
+          3. Depredadores cazan en sus árboles asignados.
+          4. Sobrevivientes regresan, dejan 1-2 hijos y mueren.
+
         Returns:
             DayStats con las estadísticas del día recién simulado.
         """
-        day_number   = len(self.history) + 1
-        assignments  = self._assign_to_trees()
-        survivors:    List[Creature] = []
-        total_deaths: int            = 0
+        day_number               = len(self.history) + 1
+        assignments, starved     = self._assign_to_trees()
+        survivors: List[Creature] = []
+        predator_deaths: int      = 0
         for has_predator, group in assignments:
             if not has_predator:
                 survivors.extend(group)
@@ -357,8 +366,9 @@ class Simulation:
                     group, self.config.escape_probability
                 )
                 survivors.extend(escaped)
-                total_deaths += len(group) - len(escaped)
+                predator_deaths += len(group) - len(escaped)
         self.creatures, births = self._reproduce(survivors)
+        total_deaths = predator_deaths + starved
         stats = self._collect_stats(day_number, total_deaths, births)
         self.history.append(stats)
         return stats
