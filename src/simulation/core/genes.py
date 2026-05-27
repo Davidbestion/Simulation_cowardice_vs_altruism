@@ -63,15 +63,42 @@ class AltruistGene(Gene):
             eaten = 1
         return survivors, eaten
 
+class SelectiveAltruistGene(Gene):
+    """A gene that gives the creature altruistic behavior only towards green-bearded individuals."""
 
-# class NoPhysicalGene(Gene):
-#     """A gene that has no physical effect."""
+    name: str = "selective_altruist"
+    PRIORITY: int = 25
 
-#     name: str = "no_physical"
-#     PRIORITY: int = 0
+    def apply_behavioral_traits(self, creature: Creature) -> Dict[str, bool]:
+        return {"altruistic": True}
 
-#     def apply_physical_traits(self, creature: Creature) -> Dict[str, bool]:
-#         return {}
+    def predator_behavior(self, notifier: Creature, assigned: List[Creature], cfg: Any):
+        # Notifier warns only creatures with green_beard
+        green_targets = [c for c in assigned if c.has_trait("green_beard") and c is not notifier]
+        if green_targets:
+            survivors = list(green_targets)
+            # Notifier escapes probabilistically
+            if random.random() < getattr(cfg, "altruist_escape_prob", 0.5):
+                survivors.append(notifier)
+                eaten = len([c for c in assigned if c not in survivors])
+            else:
+                # notifier eaten, others non-green eaten
+                eaten = 1 + len([c for c in assigned if c not in survivors and c is not notifier])
+            return survivors, eaten
+        else:
+            # No green targets: notifier flees, others die
+            survivors = [notifier]
+            eaten = max(0, len(assigned) - 1)
+            return survivors, eaten
+
+class NoPhysicalGene(Gene):
+    """A gene that has no physical effect."""
+
+    name: str = "no_physical"
+    PRIORITY: int = 0
+
+    def apply_physical_traits(self, creature: Creature) -> Dict[str, bool]:
+        return {}
 
 
 class GreenBeardGene(Gene):

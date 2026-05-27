@@ -1,7 +1,7 @@
-from ..core.genes import Gene, CowardGene, GreenBeardAltruistGene
-from ..core.creature import Creature
-from ..core.simulation import Experiment, SimulationConfig
-from ..core.world import World
+from simulation.core.genes import Gene, CowardGene, GreenBeardAltruistGene
+from simulation.core.creature import Creature
+from simulation.core.simulation import Experiment, SimulationConfig
+from simulation.core.world import World
 
 configuration = SimulationConfig(
     num_generations=100,
