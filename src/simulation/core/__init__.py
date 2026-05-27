@@ -4,7 +4,7 @@ from .genes import (
     Gene,
     CowardGene,
     AltruistGene,
-    NoPhysicalGene,
+    # NoPhysicalGene,
     GreenBeardGene,
     GreenBeardAltruistGene,
 )
@@ -16,7 +16,7 @@ __all__ = [
     "Gene",
     "CowardGene",
     "AltruistGene",
-    "NoPhysicalGene",
+    # "NoPhysicalGene",
     "GreenBeardGene",
     "GreenBeardAltruistGene",
     "SimulationConfig",
