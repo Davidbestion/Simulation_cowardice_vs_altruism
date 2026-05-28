@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from simulation.instances.loader import discover_experiments, discover_configurations
 from simulation.core.simulator import Simulator
 from simulation.core.simulation import SimulationConfig
+from dataclasses import replace as dc_replace
 
 
 def main() -> None:
@@ -22,7 +23,13 @@ def main() -> None:
     parser.add_argument("--experiment", "-e", help="Experiment name to run (use --list-experiments)")
     parser.add_argument("--config", "-c", help="Configuration name to use (use --list-configs)")
     parser.add_argument("--run-all", action="store_true", help="Run all experiments with all discovered configurations")
+    parser.add_argument("--repeats", "-r", type=int, default=1, help="Number of times to repeat each selected run")
+    parser.add_argument("--aggregate", action="store_true", help="Create aggregated plots across repeats")
+    parser.add_argument("--deterministic", action="store_true", help="When repeating, use deterministic seeds (base seed + run index). By default repeats are non-deterministic to produce varied outcomes.")
     args = parser.parse_args()
+
+    if args.show:
+        args.plot = True
 
     exps = discover_experiments()
     configs = discover_configurations()
@@ -83,58 +90,77 @@ def main() -> None:
             else:
                 runs.append((exp, None, f"{getattr(exp,'__name__',str(exp))}"))
 
-    # Execute runs
+    # Execute runs (support repeats and aggregated plotting)
     for exp, cfg, label in runs:
-        # instantiate experiment if class
-        if isinstance(exp, type):
-            e = exp()
-        else:
-            e = exp
+        safe_label = str(label).replace("None", "default")
+        outdir = ROOT / "results" / "plots"
+        outdir.mkdir(parents=True, exist_ok=True)
 
-        # apply config override if provided
-        if cfg is not None:
-            try:
+        all_reports = []
+        exp_cls = exp if isinstance(exp, type) else type(exp)
+        for i in range(max(1, args.repeats)):
+            # instantiate fresh experiment for each repetition
+            e_run = exp_cls()
+
+            # determine base configuration and apply per-run seed if requested
+            base_cfg = cfg if cfg is not None else getattr(e_run, "config", None)
+            if base_cfg is not None:
+                if args.repeats > 1:
+                    # Default: make repeated runs vary. If the user requests deterministic
+                    # repetition, generate seeds as base + index; otherwise leave seed None
+                    # so the system RNG produces different runs.
+                    if args.deterministic:
+                        run_seed = base_cfg.seed + i if base_cfg.seed is not None else None
+                        run_cfg = dc_replace(base_cfg, seed=run_seed)
+                    else:
+                        # If base_cfg has a seed, replace it with None to use system randomness.
+                        run_cfg = dc_replace(base_cfg, seed=None) if base_cfg.seed is not None else base_cfg
+                else:
+                    run_cfg = base_cfg
                 # override instance attribute (shadows property)
-                e.config = cfg
-            except Exception:
-                pass
+                try:
+                    e_run.config = run_cfg
+                except Exception:
+                    pass
 
-        print("Running:", getattr(e, "name", repr(e)))
-        sim = Simulator(e)
-        reports = sim.run()
-        for r in reports:
-            print(f"Gen {r.generation}: start={r.population_start} eaten={r.eaten} starved={r.starved} fed_survived={r.survived} end={r.population_end}")
+            print(f"Running: {getattr(e_run, 'name', repr(e_run))} (run {i+1}/{max(1, args.repeats)})")
+            sim = Simulator(e_run, config_override=run_cfg if 'run_cfg' in locals() else None)
+            reports = sim.run()
+            all_reports.append(reports)
+            for r in reports:
+                print(f"Gen {r.generation}: start={r.population_start} eaten={r.eaten} starved={r.starved} fed_survived={r.survived} end={r.population_end}")
 
-        # Plotting per-run
-        if args.plot:
+            # Per-run plotting
+            if args.plot:
+                try:
+                    from simulation.analysis.plotting import plot_population_stats, plot_gene_frequencies
+                    pop_path = outdir / f"population_{safe_label}_run{i+1}.png"
+                    genes_path = outdir / f"gene_distribution_{safe_label}_run{i+1}.png"
+                    plot_population_stats(reports, save_path=str(pop_path), show=args.show)
+                    plot_gene_frequencies(reports, save_path=str(genes_path), show=args.show)
+                    print("Saved plots to", outdir)
+                except Exception as exc:
+                    print("Plotting skipped (missing dependency or error):", exc)
+
+        # Aggregated plotting across repeats
+        if args.repeats > 1 and args.aggregate:
             try:
-                from simulation.analysis.plotting import plot_population_stats, plot_gene_frequencies
-                outdir = ROOT / "results" / "plots"
-                outdir.mkdir(parents=True, exist_ok=True)
-                safe_label = label.replace(None, "default")
-                pop_path = outdir / f"population_{safe_label}.png"
-                genes_path = outdir / f"gene_distribution_{safe_label}.png"
-                plot_population_stats(reports, save_path=str(pop_path), show=args.show)
-                plot_gene_frequencies(reports, save_path=str(genes_path), show=args.show)
-                print("Saved plots to", outdir)
+                from simulation.analysis.plotting import (
+                    plot_aggregated_population_stats,
+                    plot_aggregated_gene_frequencies_final,
+                    plot_aggregated_gene_evolution,
+                )
+                pop_agg_path = outdir / f"population_agg_{safe_label}.png"
+                genes_agg_path = outdir / f"gene_distribution_agg_{safe_label}.png"
+                gene_evo_path = outdir / f"gene_evolution_agg_{safe_label}.png"
+                plot_aggregated_population_stats(all_reports, save_path=str(pop_agg_path), show=args.show)
+                plot_aggregated_gene_frequencies_final(all_reports, save_path=str(genes_agg_path), show=args.show)
+                plot_aggregated_gene_evolution(all_reports, save_path=str(gene_evo_path), show=args.show)
+                print("Saved aggregated plots to", outdir)
             except Exception as exc:
-                print("Plotting skipped (missing dependency or error):", exc)
+                print("Aggregated plotting skipped (missing dependency or error):", exc)
 
-    if args.show:
-        args.plot = True
-
-    if args.plot:
-        try:
-            from simulation.analysis.plotting import plot_population_stats, plot_gene_frequencies
-            outdir = ROOT / "results" / "plots"
-            outdir.mkdir(parents=True, exist_ok=True)
-            pop_path = outdir / "population.png"
-            genes_path = outdir / "gene_distribution.png"
-            plot_population_stats(reports, save_path=str(pop_path), show=args.show)
-            plot_gene_frequencies(reports, save_path=str(genes_path), show=args.show)
-            print("Saved plots to", outdir)
-        except Exception as exc:
-            print("Plotting skipped (missing dependency or error):", exc)
+    # done
 
 
 if __name__ == "__main__":

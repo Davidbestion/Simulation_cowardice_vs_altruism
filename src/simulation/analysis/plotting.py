@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 import os
+import statistics
 
 
 def plot_population_stats(reports: List, save_path: Optional[str] = None, show: bool = False):
@@ -34,7 +35,174 @@ def plot_population_stats(reports: List, save_path: Optional[str] = None, show: 
     ax.set_xlabel("Generation")
     ax.set_ylabel("Count")
     ax.set_title("Population outcomes per generation")
-    ax.legend()
+    ax.legend(loc="upper right")
+    ax.grid(True)
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, bbox_inches="tight")
+    if show:
+        plt.show()
+    plt.close(fig)
+    return fig
+
+
+def plot_aggregated_population_stats(all_reports: List[List], save_path: Optional[str] = None, show: bool = False, plot_individual: bool = True):
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        raise ImportError("matplotlib is required for plotting") from exc
+
+    if not all_reports:
+        raise ValueError("No reports provided for aggregation")
+
+    # Determine max generations across runs
+    max_gens = max((len(r) for r in all_reports), default=0)
+    if max_gens == 0:
+        raise ValueError("No generation data found in reports")
+
+    # Build padded series of population_end per run
+    padded = []
+    for reports in all_reports:
+        series = [rep.population_end for rep in reports]
+        if len(series) < max_gens:
+            series = series + [0] * (max_gens - len(series))
+        padded.append(series)
+
+    gens = list(range(1, max_gens + 1))
+    means = []
+    stds = []
+    for i in range(max_gens):
+        vals = [run[i] for run in padded]
+        means.append(statistics.mean(vals))
+        stds.append(statistics.stdev(vals) if len(vals) > 1 else 0.0)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    if plot_individual:
+        for run in padded:
+            ax.plot(gens, run, color="gray", alpha=0.25)
+
+    ax.plot(gens, means, color="red", lw=2, label="Mean population (end)")
+    lower = [m - s for m, s in zip(means, stds)]
+    upper = [m + s for m, s in zip(means, stds)]
+    ax.fill_between(gens, lower, upper, color="red", alpha=0.2, label="±1 std")
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Population (end)")
+    ax.set_title("Aggregated population across runs")
+    ax.legend(loc="upper right")
+    ax.grid(True)
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, bbox_inches="tight")
+    if show:
+        plt.show()
+    plt.close(fig)
+    return fig
+
+
+def plot_aggregated_gene_frequencies_final(all_reports: List[List], save_path: Optional[str] = None, show: bool = False, top_n: Optional[int] = None):
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        raise ImportError("matplotlib is required for plotting") from exc
+
+    if not all_reports:
+        raise ValueError("No reports provided for aggregation")
+
+    # Collect final gene frequency dicts from each run
+    final_freqs = []
+    for reports in all_reports:
+        if not reports:
+            continue
+        final_freqs.append(reports[-1].gene_frequencies)
+
+    if not final_freqs:
+        raise ValueError("No final generation data found in reports")
+
+    gene_set = set()
+    for d in final_freqs:
+        gene_set.update(d.keys())
+    genes = sorted(gene_set)
+
+    import math
+
+    means = []
+    stds = []
+    for g in genes:
+        vals = [d.get(g, 0.0) for d in final_freqs]
+        means.append(statistics.mean(vals))
+        stds.append(statistics.stdev(vals) if len(vals) > 1 else 0.0)
+
+    # Optionally select top_n genes by mean frequency
+    if top_n is not None and top_n < len(genes):
+        combined = sorted(zip(genes, means, stds), key=lambda x: x[1], reverse=True)[:top_n]
+        genes, means, stds = zip(*combined)
+
+    x = list(range(len(genes)))
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(x, means, yerr=stds, align="center", alpha=0.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels(genes, rotation=45, ha="right")
+    ax.set_ylabel("Average relative frequency (final generation)")
+    ax.set_title("Aggregated gene distribution (final generation)")
+    ax.grid(True, axis="y")
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, bbox_inches="tight")
+    if show:
+        plt.show()
+    plt.close(fig)
+    return fig
+
+
+def plot_aggregated_gene_evolution(all_reports: List[List], save_path: Optional[str] = None, show: bool = False, top_n: int = 6):
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        raise ImportError("matplotlib is required for plotting") from exc
+
+    if not all_reports:
+        raise ValueError("No reports provided for aggregation")
+
+    max_gens = max((len(r) for r in all_reports), default=0)
+    if max_gens == 0:
+        raise ValueError("No generation data found in reports")
+
+    # Collect all gene names
+    gene_set = set()
+    for reports in all_reports:
+        for rep in reports:
+            gene_set.update(rep.gene_frequencies.keys())
+    genes = sorted(gene_set)
+
+    # Build per-generation mean frequency per gene
+    mean_series = {g: [] for g in genes}
+    for gen_idx in range(max_gens):
+        for g in genes:
+            vals = []
+            for reports in all_reports:
+                if gen_idx < len(reports):
+                    vals.append(reports[gen_idx].gene_frequencies.get(g, 0.0))
+                else:
+                    vals.append(0.0)
+            mean_series[g].append(statistics.mean(vals))
+
+    # Select top_n genes by average over time
+    avg_over_time = {g: statistics.mean(mean_series[g]) for g in genes}
+    top_genes = sorted(avg_over_time.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    top_names = [g for g, _ in top_genes]
+
+    gens = list(range(1, max_gens + 1))
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for g in top_names:
+        ax.plot(gens, mean_series[g], label=g)
+
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Average relative frequency")
+    ax.set_title("Gene frequency evolution (aggregated)")
+    ax.legend(loc="upper right")
     ax.grid(True)
 
     if save_path:
@@ -79,7 +247,7 @@ def plot_gene_frequencies(reports: List, save_path: Optional[str] = None, show: 
     ax.set_ylabel(ylabel)
     ax.set_title(title)
     if genes:
-        ax.legend(loc="upper left")
+        ax.legend(loc="upper right")
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)

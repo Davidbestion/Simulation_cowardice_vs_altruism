@@ -10,9 +10,10 @@ from .creature import Creature
 class Simulator:
     """Runs an Experiment day-by-day and collects GenerationReport objects."""
 
-    def __init__(self, experiment: Experiment):
+    def __init__(self, experiment: Experiment, config_override: SimulationConfig | None = None):
         self.experiment = experiment
-        self.config: SimulationConfig = experiment.config
+        # Allow overriding the experiment's config for per-run variability
+        self.config: SimulationConfig = config_override if config_override is not None else experiment.config
 
     def _initialize_population(self) -> List[Creature]:
         cfg = self.config
