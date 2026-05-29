@@ -148,14 +148,14 @@ def main() -> None:
                 from simulation.analysis.plotting import (
                     plot_aggregated_population_stats,
                     plot_aggregated_gene_frequencies_final,
-                    plot_aggregated_gene_evolution,
+                    plot_aggregated_gene_distribution,
                 )
                 pop_agg_path = outdir / f"population_agg_{safe_label}.png"
                 genes_agg_path = outdir / f"gene_distribution_agg_{safe_label}.png"
                 gene_evo_path = outdir / f"gene_evolution_agg_{safe_label}.png"
                 plot_aggregated_population_stats(all_reports, save_path=str(pop_agg_path), show=args.show)
                 plot_aggregated_gene_frequencies_final(all_reports, save_path=str(genes_agg_path), show=args.show)
-                plot_aggregated_gene_evolution(all_reports, save_path=str(gene_evo_path), show=args.show)
+                plot_aggregated_gene_distribution(all_reports, save_path=str(gene_evo_path), show=args.show)
                 print("Saved aggregated plots to", outdir)
             except Exception as exc:
                 print("Aggregated plotting skipped (missing dependency or error):", exc)

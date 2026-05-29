@@ -78,14 +78,20 @@ def plot_aggregated_population_stats(all_reports: List[List], save_path: Optiona
         stds.append(statistics.stdev(vals) if len(vals) > 1 else 0.0)
 
     fig, ax = plt.subplots(figsize=(10, 6))
+    # plot individual runs first with low z-order so they stay beneath summary visuals
     if plot_individual:
         for run in padded:
-            ax.plot(gens, run, color="gray", alpha=0.25)
+            ax.plot(gens, run, color="gray", alpha=0.15, linewidth=0.8, zorder=1)
 
-    ax.plot(gens, means, color="red", lw=2, label="Mean population (end)")
     lower = [m - s for m, s in zip(means, stds)]
     upper = [m + s for m, s in zip(means, stds)]
-    ax.fill_between(gens, lower, upper, color="red", alpha=0.2, label="±1 std")
+    # draw the std band above individual runs
+    ax.fill_between(gens, lower, upper, color="red", alpha=0.18, label="±1 std", zorder=2)
+    # outline the band so it remains visible when many faint runs overlap
+    ax.plot(gens, lower, color="red", alpha=0.6, linewidth=0.8, linestyle="--", zorder=3)
+    ax.plot(gens, upper, color="red", alpha=0.6, linewidth=0.8, linestyle="--", zorder=3)
+    # finally draw the mean on top
+    ax.plot(gens, means, color="red", lw=2, marker="o", markersize=4, label="Mean population (end)", zorder=4)
     ax.set_xlabel("Generation")
     ax.set_ylabel("Population (end)")
     ax.set_title("Aggregated population across runs")
@@ -203,6 +209,68 @@ def plot_aggregated_gene_evolution(all_reports: List[List], save_path: Optional[
     ax.set_ylabel("Average relative frequency")
     ax.set_title("Gene frequency evolution (aggregated)")
     ax.legend(loc="upper right")
+    ax.grid(True)
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, bbox_inches="tight")
+    if show:
+        plt.show()
+    plt.close(fig)
+    return fig
+
+
+def plot_aggregated_gene_distribution(all_reports: List[List], save_path: Optional[str] = None, show: bool = False, relative: bool = True):
+    """Plot stacked gene distribution per generation averaged across runs.
+
+    For each generation index, compute the mean relative frequency of each gene
+    across the provided runs, then create a stackplot like `plot_gene_frequencies`
+    but using the averaged series.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        raise ImportError("matplotlib is required for plotting") from exc
+
+    if not all_reports:
+        raise ValueError("No reports provided for aggregation")
+
+    max_gens = max((len(r) for r in all_reports), default=0)
+    if max_gens == 0:
+        raise ValueError("No generation data found in reports")
+
+    # collect all gene names across all runs and gens
+    gene_set = set()
+    for reports in all_reports:
+        for rep in reports:
+            gene_set.update(rep.gene_frequencies.keys())
+    genes = sorted(gene_set)
+
+    # Build averaged series per gene per generation
+    mean_series = {g: [] for g in genes}
+    for gen_idx in range(max_gens):
+        for g in genes:
+            vals = []
+            for reports in all_reports:
+                if gen_idx < len(reports):
+                    vals.append(reports[gen_idx].gene_frequencies.get(g, 0.0))
+                else:
+                    vals.append(0.0)
+            mean_series[g].append(statistics.mean(vals))
+
+    gens = list(range(1, max_gens + 1))
+
+    # Prepare data for stackplot in the same gene order as `genes`
+    data = [mean_series[g] for g in genes]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    if data:
+        ax.stackplot(gens, *data, labels=genes)
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Relative frequency" if relative else "Counts")
+    ax.set_title("Aggregated gene distribution per generation (mean across runs)")
+    if genes:
+        ax.legend(loc="upper right")
     ax.grid(True)
 
     if save_path:

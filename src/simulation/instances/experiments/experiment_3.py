@@ -36,6 +36,6 @@ class Experiment3(Experiment):
     @property
     def population_specs(self) -> list[tuple[callable, float]]:
         return [
-            (lambda: [CowardGene()], 0.5),  # 50% CowardGene
-            (lambda: [GreenBeardAltruistGene()], 0.5),  # 50% GreenBeardAltruistGene
+            (lambda: [CowardGene()], 0.9),  # 50% CowardGene
+            (lambda: [GreenBeardAltruistGene()], 0.1),  # 50% GreenBeardAltruistGene
         ]
