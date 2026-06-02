@@ -25,6 +25,7 @@ def main() -> None:
     parser.add_argument("--run-all", action="store_true", help="Run all experiments with all discovered configurations")
     parser.add_argument("--repeats", "-r", type=int, default=1, help="Number of times to repeat each selected run")
     parser.add_argument("--aggregate", action="store_true", help="Create aggregated plots across repeats")
+    parser.add_argument("--plot-individual", action="store_true", help="Overlay individual run boundary lines on aggregated gene distribution stackplot")
     parser.add_argument("--deterministic", action="store_true", help="When repeating, use deterministic seeds (base seed + run index). By default repeats are non-deterministic to produce varied outcomes.")
     args = parser.parse_args()
 
@@ -155,7 +156,7 @@ def main() -> None:
                 gene_evo_path = outdir / f"gene_evolution_agg_{safe_label}.png"
                 plot_aggregated_population_stats(all_reports, save_path=str(pop_agg_path), show=args.show)
                 plot_aggregated_gene_frequencies_final(all_reports, save_path=str(genes_agg_path), show=args.show)
-                plot_aggregated_gene_distribution(all_reports, save_path=str(gene_evo_path), show=args.show)
+                plot_aggregated_gene_distribution(all_reports, save_path=str(gene_evo_path), show=args.show, plot_individual=args.plot_individual)
                 print("Saved aggregated plots to", outdir)
             except Exception as exc:
                 print("Aggregated plotting skipped (missing dependency or error):", exc)

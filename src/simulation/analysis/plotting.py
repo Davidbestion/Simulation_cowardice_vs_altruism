@@ -220,12 +220,17 @@ def plot_aggregated_gene_evolution(all_reports: List[List], save_path: Optional[
     return fig
 
 
-def plot_aggregated_gene_distribution(all_reports: List[List], save_path: Optional[str] = None, show: bool = False, relative: bool = True):
+def plot_aggregated_gene_distribution(all_reports: List[List], save_path: Optional[str] = None, show: bool = False, relative: bool = True, plot_individual: bool = False):
     """Plot stacked gene distribution per generation averaged across runs.
 
     For each generation index, compute the mean relative frequency of each gene
     across the provided runs, then create a stackplot like `plot_gene_frequencies`
     but using the averaged series.
+
+    If plot_individual is True, overlay each individual run's gene boundary lines
+    as faint semi-transparent lines. For two genes this produces exactly one
+    boundary line per run (the frequency of the first gene); for N genes there
+    are N-1 boundary lines (cumulative sums).
     """
     try:
         import matplotlib.pyplot as plt
@@ -264,8 +269,33 @@ def plot_aggregated_gene_distribution(all_reports: List[List], save_path: Option
     data = [mean_series[g] for g in genes]
 
     fig, ax = plt.subplots(figsize=(10, 6))
+    stack_polys = []
     if data:
-        ax.stackplot(gens, *data, labels=genes)
+        stack_polys = ax.stackplot(gens, *data, labels=genes)
+
+    # Overlay individual run boundary lines
+    if plot_individual and len(genes) >= 2:
+        # Extract the fill color of each stacked area to tint the boundary lines
+        colors = [poly.get_facecolor()[0] for poly in stack_polys]
+        for reports in all_reports:
+            cumsum = [0.0] * max_gens
+            for k, g in enumerate(genes[:-1]):
+                for gen_idx in range(max_gens):
+                    val = (
+                        reports[gen_idx].gene_frequencies.get(g, 0.0)
+                        if gen_idx < len(reports)
+                        else 0.0
+                    )
+                    cumsum[gen_idx] += val
+                ax.plot(
+                    gens,
+                    list(cumsum),
+                    color="black",
+                    alpha=0.25,
+                    linewidth=0.8,
+                    zorder=3,
+                )
+
     ax.set_xlabel("Generation")
     ax.set_ylabel("Relative frequency" if relative else "Counts")
     ax.set_title("Aggregated gene distribution per generation (mean across runs)")

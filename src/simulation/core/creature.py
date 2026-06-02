@@ -9,14 +9,13 @@ class Creature:
     def __init__(self, genome: list, min_offspring: int = 1, max_offspring: int = 2) -> None:
         self.genome = genome
         self.physical_traits = self.get_physical_traits()
-        self.behavioral_traits = self.get_behavioral_traits()
         self.creature_id = uuid.uuid4().hex[:6]
         self.min_offspring = min_offspring
         self.max_offspring = max_offspring
 
     def has_trait(self, trait: str) -> bool:
-        """Return True if the creature's traits dict has a truthy value for *trait*."""
-        return bool(self.physical_traits.get(trait, False)) or bool(self.behavioral_traits.get(trait, False))
+        """Return True if the creature's physical traits dict has a truthy value for *trait*."""
+        return bool(self.physical_traits.get(trait, False))
 
     def has_gene(self, gene_type: type) -> bool:
         """Return True if the genome contains at least one instance of *gene_type*."""
@@ -27,13 +26,6 @@ class Creature:
         traits = {}
         for gene in self.genome:
             traits.update(gene.apply_physical_traits(self))
-        return traits
-
-    def get_behavioral_traits(self) -> dict:
-        """Return a dict of the creature's behavioral traits."""
-        traits = {}
-        for gene in self.genome:
-            traits.update(gene.apply_behavioral_traits(self))
         return traits
 
     def handle_predator(self, assigned: List["Creature"], cfg: Any) -> Tuple[List["Creature"], int]:

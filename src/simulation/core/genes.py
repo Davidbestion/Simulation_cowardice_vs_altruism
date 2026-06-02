@@ -15,9 +15,6 @@ class Gene(ABC):
     def apply_physical_traits(self, creature: Creature) -> Dict[str, bool]:
         return {}
 
-    def apply_behavioral_traits(self, creature: Creature) -> Dict[str, bool]:
-        return {}
-
     def predator_behavior(self, notifier: Creature, assigned: List[Creature], cfg: Any) -> Optional[Tuple[List[Creature], int]]:
         """Return (survivors, eaten_count) when `notifier` acts under predator.
 
@@ -32,9 +29,6 @@ class CowardGene(Gene):
     name: str = "coward"
     PRIORITY: int = 10
 
-    def apply_behavioral_traits(self, creature: Creature) -> Dict[str, bool]:
-        return {"cowardly": True}
-
     def predator_behavior(self, notifier: Creature, assigned: List[Creature], cfg: Any):
         # Coward flees, others die
         survivors = [notifier]
@@ -47,9 +41,6 @@ class AltruistGene(Gene):
 
     name: str = "altruist"
     PRIORITY: int = 20
-
-    def apply_behavioral_traits(self, creature: Creature) -> Dict[str, bool]:
-        return {"altruistic": True}
 
     def predator_behavior(self, notifier: Creature, assigned: List[Creature], cfg: Any):
         # Notifier warns everyone else -> they all escape 100%.
@@ -68,9 +59,6 @@ class SelectiveAltruistGene(Gene):
 
     name: str = "selective_altruist"
     PRIORITY: int = 25
-
-    def apply_behavioral_traits(self, creature: Creature) -> Dict[str, bool]:
-        return {"altruistic": True}
 
     def predator_behavior(self, notifier: Creature, assigned: List[Creature], cfg: Any):
         # Notifier warns only creatures with green_beard
@@ -119,9 +107,6 @@ class GreenBeardAltruistGene(Gene):
 
     def apply_physical_traits(self, creature: Creature) -> Dict[str, bool]:
         return {"green_beard": True}
-
-    def apply_behavioral_traits(self, creature: Creature) -> Dict[str, bool]:
-        return {"altruistic": True}
 
     def predator_behavior(self, notifier: Creature, assigned: List[Creature], cfg: Any):
         # Notifier warns only creatures with green_beard

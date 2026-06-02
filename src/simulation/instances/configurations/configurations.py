@@ -7,7 +7,7 @@ from simulation.core.simulation import SimulationConfig
 
 default_config = SimulationConfig(
 	num_trees=25,
-	num_generations=400,
+	num_generations=200,
 	initial_population=80,
 	predator_probability=0.30,
 	offspring_min=1,

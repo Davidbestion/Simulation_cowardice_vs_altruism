@@ -36,10 +36,11 @@ class Experiment4(Experiment):
     @property
     def population_specs(self) -> list[tuple[callable, float]]:
         return [
-            (lambda: [CowardGene()], 0.25),  # All creatures start with the CowardGene
-            (lambda: [SelectiveAltruistGene()], 0.25),  # 25% SelectiveAltruistGene
-            (lambda: [GreenBeardGene(),CowardGene()], 0.25),  # 25 % GreenBeardGene + CowardGene
             (lambda: [GreenBeardAltruistGene()], 0.25),  # 25% GreenBeardAltruistGene
+            (lambda: [GreenBeardGene(),CowardGene()], 0.25),  # 25 % GreenBeardGene + CowardGene
+            (lambda: [SelectiveAltruistGene()], 0.25),  # 25% SelectiveAltruistGene
+            (lambda: [CowardGene()], 0.25),  # All creatures start with the CowardGene
+            
         ]
     
     # Four population types:
