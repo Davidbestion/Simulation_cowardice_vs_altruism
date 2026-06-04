@@ -1,7 +1,5 @@
-from simulation.core.genes import Gene, CowardGene, GreenBeardAltruistGene
-from simulation.core.creature import Creature
+from simulation.core.genes import CowardGene, GreenBeardAltruistGene
 from simulation.core.simulation import Experiment, SimulationConfig
-from simulation.core.world import World
 
 configuration = SimulationConfig(
     num_generations=100,
@@ -34,8 +32,8 @@ class Experiment3(Experiment):
         return configuration
 
     @property
-    def population_specs(self) -> list[tuple[callable, float]]:
+    def herbivore_specs(self) -> list[tuple[callable, float]]:
         return [
-            (lambda: [CowardGene()], 0.9),  # 50% CowardGene
-            (lambda: [GreenBeardAltruistGene()], 0.1),  # 50% GreenBeardAltruistGene
+            (lambda: [CowardGene()], 0.9),
+            (lambda: [GreenBeardAltruistGene()], 0.1),
         ]

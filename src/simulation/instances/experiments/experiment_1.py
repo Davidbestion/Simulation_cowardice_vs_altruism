@@ -1,7 +1,5 @@
-from simulation.core.genes import Gene, CowardGene, GreenBeardAltruistGene
-from simulation.core.creature import Creature
+from simulation.core.genes import CowardGene
 from simulation.core.simulation import Experiment, SimulationConfig
-from simulation.core.world import World
 
 configuration = SimulationConfig(
     num_generations=100,
@@ -34,7 +32,7 @@ class Experiment1(Experiment):
         return configuration
 
     @property
-    def population_specs(self) -> list[tuple[callable, float]]:
+    def herbivore_specs(self) -> list[tuple[callable, float]]:
         return [
             (lambda: [CowardGene()], 1.0),  # All creatures start with the CowardGene
         ]

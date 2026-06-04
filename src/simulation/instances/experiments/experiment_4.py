@@ -1,7 +1,5 @@
-from simulation.core.genes import Gene, CowardGene, GreenBeardAltruistGene, AltruistGene, GreenBeardGene, SelectiveAltruistGene
-from simulation.core.creature import Creature
+from simulation.core.genes import CowardGene, GreenBeardAltruistGene, GreenBeardGene, SelectiveAltruistGene
 from simulation.core.simulation import Experiment, SimulationConfig
-from simulation.core.world import World
 
 configuration = SimulationConfig(
     num_generations=100,
@@ -34,13 +32,12 @@ class Experiment4(Experiment):
         return configuration
 
     @property
-    def population_specs(self) -> list[tuple[callable, float]]:
+    def herbivore_specs(self) -> list[tuple[callable, float]]:
         return [
-            (lambda: [GreenBeardAltruistGene()], 0.25),  # 25% GreenBeardAltruistGene
-            (lambda: [GreenBeardGene(),CowardGene()], 0.25),  # 25 % GreenBeardGene + CowardGene
-            (lambda: [SelectiveAltruistGene()], 0.25),  # 25% SelectiveAltruistGene
-            (lambda: [CowardGene()], 0.25),  # All creatures start with the CowardGene
-            
+            (lambda: [GreenBeardAltruistGene()], 0.25),
+            (lambda: [GreenBeardGene(), CowardGene()], 0.25),
+            (lambda: [SelectiveAltruistGene()], 0.25),
+            (lambda: [CowardGene()], 0.25),
         ]
     
     # Four population types:
