@@ -359,7 +359,7 @@ class SolitaryGene(Gene):
         return rng.choice(bottom).tree_id
 
 
-class HiddenHerbivoreGene(Gene):
+class CamouflageHerbivoreGene(Gene):
     """El herbívoro es difícil de detectar, tanto al elegir el depredador su árbol como durante la caza.
 
     Produce dos efectos combinados:
@@ -388,7 +388,7 @@ class HiddenHerbivoreGene(Gene):
 # ============================================================= PREDATOR GENES
 
 
-class CamouflageGene(Gene):
+class CamouflagePredatorGene(Gene):
     """El depredador es difícil de detectar por los herbívoros.
 
     Aporta el rasgo físico ``camouflage_factor`` (0–1) al depredador.  El
@@ -492,6 +492,143 @@ class GreedyHunterGene(Gene):
             ``current_capacity + self.bonus``.
         """
         return current_capacity + self.bonus
+
+
+class SocialGreenBeardAltruistGene(Gene):
+    """Barba verde + altruismo selectivo + comportamiento de manada en un solo gen.
+
+    Combina tres rasgos:
+
+    1. **Señal de barba verde** (``apply_physical_traits``): la criatura es
+       reconocida como aliada por otros portadores del mismo gen.
+    2. **Altruismo selectivo** (``predator_behavior``): al detectar un depredador,
+       avisa a todos los portadores de barba verde del árbol; el notificador
+       se sacrifica con probabilidad ``1 − altruist_escape_prob``.
+    3. **Comportamiento social** (``choose_tree``): el herbívoro prefiere los
+       árboles con mayor ocupación actual, buscando la seguridad del grupo.
+       En caso de empate elige aleatoriamente entre los más concurridos.
+    """
+
+    name = "social_green_beard_altruist"
+    PRIORITY = 35
+
+    def apply_physical_traits(self, creature: Creature) -> Dict[str, Any]:
+        return {"green_beard": True}
+
+    def choose_tree(
+        self,
+        creature: Herbivore,
+        available_trees: list,
+        all_assignments: Dict[int, list],
+        cfg: Any,
+        rng: random.Random,
+    ) -> Optional[int]:
+        if not available_trees:
+            return None
+        available_trees = sorted(
+            available_trees,
+            key=lambda t: len(all_assignments.get(t.tree_id, [])),
+            reverse=True,
+        )
+        best_count = len(all_assignments.get(available_trees[0].tree_id, []))
+        top = [t for t in available_trees if len(all_assignments.get(t.tree_id, [])) == best_count]
+        return rng.choice(top).tree_id
+
+    def predator_behavior(
+        self,
+        notifier: Herbivore,
+        assigned: List[Herbivore],
+        cfg: Any,
+        rng: random.Random,
+    ) -> Tuple[List[Herbivore], List[Herbivore]]:
+        green_targets = [c for c in assigned if c.has_trait("green_beard") and c is not notifier]
+        if green_targets:
+            if rng.random() < getattr(cfg, "altruist_escape_prob", 0.5):
+                return [notifier] + green_targets, []
+            else:
+                return green_targets, [notifier]
+        else:
+            return [notifier], []
+
+
+class SolitaryCowardGene(Gene):
+    """Solitario + cobarde: evita árboles concurridos y huye solo ante el depredador.
+
+    Combina dos estrategias individualistas:
+    1. **Elección de árbol** (``choose_tree``): prefiere los árboles con menos
+       ocupantes, minimizando el tiempo de contacto con otros herbívoros.
+    2. **Comportamiento ante depredador** (``predator_behavior``): al detectar un
+       depredador, huye solo sin avisar al grupo (comportamiento cobarde).
+
+    Hipótesis: la dispersión extrema reduce la presión de depredación local,
+    pero al coste de perder toda protección cooperativa.
+    """
+
+    name = "solitary_coward"
+    PRIORITY = 35
+
+    def choose_tree(
+        self,
+        creature: Herbivore,
+        available_trees: list,
+        all_assignments: Dict[int, list],
+        cfg: Any,
+        rng: random.Random,
+    ) -> Optional[int]:
+        if not available_trees:
+            return None
+        available_trees = sorted(
+            available_trees,
+            key=lambda t: len(all_assignments.get(t.tree_id, [])),
+        )
+        min_count = len(all_assignments.get(available_trees[0].tree_id, []))
+        bottom = [t for t in available_trees if len(all_assignments.get(t.tree_id, [])) == min_count]
+        return rng.choice(bottom).tree_id
+
+    def predator_behavior(
+        self,
+        notifier: Herbivore,
+        assigned: List[Herbivore],
+        cfg: Any,
+        rng: random.Random,
+    ) -> Tuple[List[Herbivore], List[Herbivore]]:
+        return [notifier], []
+
+
+class AmbushCamoGene(Gene):
+    """Depredador emboscador con camuflaje muy alto.
+
+    Combina dos ventajas ofensivas:
+    1. **Selección de árbol** (``predator_choose_tree``): elige siempre el árbol
+       con la mayor concentración de presas visibles (misma lógica que ``AmbushGene``).
+    2. **Camuflaje extremo** (``apply_physical_traits``): factor de camuflaje 0.9,
+       que reduce la probabilidad de detección en un 90 %.
+
+    Hipótesis: la combinación de emboscada y sigilo máximo crea una presión de
+    depredación tan intensa que puede llevar al colapso de la presa si no existe
+    un mecanismo compensador (como el agrupamiento con alerta cooperativa).
+    """
+
+    name = "ambush_camo"
+    PRIORITY = 20
+
+    def apply_physical_traits(self, creature: Creature) -> Dict[str, Any]:
+        return {"camouflage_factor": 0.9}
+
+    def predator_choose_tree(
+        self,
+        predator: Predator,
+        trees: list,
+        visible_herbivores: Dict[int, List[Herbivore]],
+        cfg: Any,
+        rng: random.Random,
+    ) -> int:
+        non_empty = [t for t in trees if visible_herbivores.get(t.tree_id)]
+        if not non_empty:
+            return rng.choice(trees).tree_id
+        max_count = max(len(visible_herbivores[t.tree_id]) for t in non_empty)
+        candidates = [t for t in non_empty if len(visible_herbivores[t.tree_id]) == max_count]
+        return rng.choice(candidates).tree_id
 
 
 # ----------------------------------------------------------------- aliases

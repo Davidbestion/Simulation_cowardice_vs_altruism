@@ -36,7 +36,7 @@ class SimulationConfig:
     offspring_min: int = 1              # herbivore (also ``herbivore_offspring_min``)
     offspring_max: int = 2              # herbivore (also ``herbivore_offspring_max``)
     predator_offspring_min: int = 1
-    predator_offspring_max: int = 1
+    predator_offspring_max: int = 2
 
     # --- Predation interactions ---
     # ``predator_probability`` is kept for config compatibility but unused in the

@@ -227,7 +227,7 @@ class Simulator:
         predators: List[Predator],
         cfg: SimulationConfig,
         rng: random.Random,
-    ) -> Tuple[List[Herbivore], int, TreeInteractionLog]:
+    ) -> Tuple[List[Herbivore], int, List[Predator], TreeInteractionLog]:
         """Fase 3: resuelve todas las interacciones en un árbol durante un día.
 
         Sub-fases internas:
@@ -276,7 +276,7 @@ class Simulator:
                 hunted=0,
                 survived=len(herbivores),
             )
-            return list(herbivores), 0, log
+            return list(herbivores), 0, [], log
 
         # Detection probability: use the camouflage of the most-camouflaged predator
         # (best-camo predator is hardest to spot; one stealthy predator still provides
@@ -321,14 +321,18 @@ class Simulator:
             if id(h) not in escaped_ids and id(h) not in eaten_ids
         ]
 
-        # Each predator hunts in random order; the prey pool shrinks after each kill
+        # Each predator hunts in random order; the prey pool shrinks after each kill.
+        # Only predators that catch ≥1 prey are "fed" and will survive to reproduce.
+        fed_predators: List[Predator] = []
         total_hunted: List[Herbivore] = []
         rng.shuffle(predators)
         for pred in predators:
             if not remaining:
-                break
+                break  # prey exhausted; remaining predators starve
             caught, remaining = pred.hunt(remaining, cfg, rng)
             total_hunted.extend(caught)
+            if caught:
+                fed_predators.append(pred)
 
         survivors = fled + remaining  # fled are safe; remaining survived the hunt
         total_eaten_count = len(directly_eaten) + len(total_hunted)
@@ -344,7 +348,7 @@ class Simulator:
             hunted=len(total_hunted),
             survived=len(survivors),
         )
-        return survivors, total_eaten_count, log
+        return survivors, total_eaten_count, fed_predators, log
 
     # ---------------------------------------------------------------- main loop
 
@@ -416,6 +420,7 @@ class Simulator:
 
             # Phase 3 – per-tree interactions
             herb_survivors: List[Herbivore] = []
+            pred_survivors: List[Predator] = []   # predators that caught ≥1 prey
             total_eaten = 0
             tree_logs: List[TreeInteractionLog] = []
 
@@ -423,11 +428,12 @@ class Simulator:
                 tree_herbs = herb_assignments[tree.tree_id]
                 tree_preds = pred_assignments[tree.tree_id]
                 if not tree_herbs:
-                    continue
-                survivors, eaten, log = self._resolve_tree(
+                    continue  # predators at empty trees catch nothing and starve
+                survivors, eaten, fed_preds, log = self._resolve_tree(
                     tree.tree_id, tree_herbs, tree_preds, cfg, rng
                 )
                 herb_survivors.extend(survivors)
+                pred_survivors.extend(fed_preds)
                 total_eaten += eaten
                 tree_logs.append(log)
 
@@ -437,7 +443,7 @@ class Simulator:
                 new_herbivores.extend(h.reproduce(rng))
 
             new_predators: List[Predator] = []
-            for p in predators:
+            for p in pred_survivors:   # only predators that caught prey reproduce
                 new_predators.extend(p.reproduce(rng))
 
             herbivores = new_herbivores
@@ -446,15 +452,21 @@ class Simulator:
             # Phase 5 – stats
             herb_counter: Counter = Counter()
             for h in herbivores:
-                for g in h.genome:
-                    herb_counter[getattr(g, "name", type(g).__name__)] += 1
+                if h.genome:
+                    for g in h.genome:
+                        herb_counter[getattr(g, "name", type(g).__name__)] += 1
+                else:
+                    herb_counter["none"] += 1
             herb_total = sum(herb_counter.values()) or 1
             herb_freqs = {k: v / herb_total for k, v in herb_counter.items()}
 
             pred_counter: Counter = Counter()
             for p in predators:
-                for g in p.genome:
-                    pred_counter[getattr(g, "name", type(g).__name__)] += 1
+                if p.genome:
+                    for g in p.genome:
+                        pred_counter[getattr(g, "name", type(g).__name__)] += 1
+                else:
+                    pred_counter["none"] += 1
             pred_total = sum(pred_counter.values()) or 1
             pred_freqs = {k: v / pred_total for k, v in pred_counter.items()}
 
