@@ -1,0 +1,27 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {1}Introducci\'on}{2}{section.1}%
+\contentsline {section}{\numberline {2}Modelo}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Entidades y estado del sistema}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Din\'amica por generaci\'on}{3}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Estrategias g\'enicas consideradas}{3}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Supuestos y alcance}{4}{subsection.2.4}%
+\contentsline {section}{\numberline {3}Implementaci\'on}{4}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Estructura general del c\'odigo}{4}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Mundo y \'arboles}{5}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Criaturas y genoma}{5}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Genes y comportamientos}{5}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Ciclo de simulaci\'on (por generaci\'on)}{7}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Asignaci\'on de herb\'ivoros a \'arboles}{7}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Depredadores y detecci\'on}{8}{subsection.3.7}%
+\contentsline {subsection}{\numberline {3.8}Generaci\'on de genomas y experimento}{8}{subsection.3.8}%
+\contentsline {subsection}{\numberline {3.9}Reproducci\'on y manejo del genoma}{8}{subsection.3.9}%
+\contentsline {subsection}{\numberline {3.10}Inicializaci\'on, semilla y reproducibilidad}{8}{subsection.3.10}%
+\contentsline {subsection}{\numberline {3.11}Reportes}{9}{subsection.3.11}%
+\contentsline {subsection}{\numberline {3.12}Notas de extensibilidad}{9}{subsection.3.12}%
+\contentsline {section}{\numberline {4}Resultados experimentales}{9}{section.4}%
+\contentsline {section}{\numberline {5}Discusi\'on global}{10}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Inestabilidad del altruismo puro y condiciones para el altruismo selectivo}{10}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Camuflaje y consecuencias diferenciales en herb\'ivoros y depredadores}{10}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Sociabilidad, cobard\'ia solitaria y la trampa de la depredaci\'on grupal}{10}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Robustez del tama\~no poblacional}{11}{subsection.5.4}%
+\contentsline {section}{\numberline {6}Conclusiones}{11}{section.6}%

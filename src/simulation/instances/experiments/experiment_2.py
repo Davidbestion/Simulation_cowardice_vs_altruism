@@ -1,41 +1,60 @@
-from simulation.core.genes import AltruistGene, Gene, CowardGene, GreenBeardAltruistGene
-from simulation.core.creature import Creature
-from simulation.core.simulation import Experiment, SimulationConfig
-from simulation.core.world import World
+"""Experimento 2 — Cobardía vs Altruismo puro.
 
-configuration = SimulationConfig(
-    num_generations=100,
-    initial_population=80,
-    predator_probability=0.30,
-    offspring_min=1,
-    offspring_max=2,
-    seed=42,
+Tres condiciones:
+  2A — p_escape=0.50, corrida única (seed=42)
+  2B — p_escape=0.90, corrida única (seed=42)
+  2C — p_escape=0.90, validación estadística 30 corridas (seed base=0)
+"""
+from simulation.core import SimulationConfig, CowardGene, AltruistGene
+from simulation.analysis.runner import SimpleExperiment, RandomPredatorGene
+
+_herbivore_specs = [
+    (lambda: [CowardGene()],   0.50),
+    (lambda: [AltruistGene()], 0.50),
+]
+_predator_specs = [(lambda: [RandomPredatorGene()], 1.0)]
+
+exp2a = SimpleExperiment(
+    name="Experimento 2A — Cobardía vs Altruismo (p_escape=0.50)",
+    description="50 % CowardGene / 50 % AltruistGene; probabilidad de escape del altruista = 0.50.",
+    config=SimulationConfig(
+        num_trees=25, tree_capacity_min=2, tree_capacity_max=2,
+        num_generations=100, initial_population=80, initial_predators=8,
+        offspring_min=1, offspring_max=2,
+        predator_offspring_min=1, predator_offspring_max=2,
+        base_detection_prob=0.30, altruist_escape_prob=0.50,
+        predator_hunt_capacity=1, seed=42,
+    ),
+    herbivore_specs=_herbivore_specs,
+    predator_specs=_predator_specs,
 )
 
-class Experiment2(Experiment):
-    """Pure cowardice vs pure altruism
+exp2b = SimpleExperiment(
+    name="Experimento 2B — Cobardía vs Altruismo (p_escape=0.90)",
+    description="50 % CowardGene / 50 % AltruistGene; probabilidad de escape del altruista = 0.90.",
+    config=SimulationConfig(
+        num_trees=25, tree_capacity_min=2, tree_capacity_max=2,
+        num_generations=200, initial_population=80, initial_predators=8,
+        offspring_min=1, offspring_max=2,
+        predator_offspring_min=1, predator_offspring_max=2,
+        base_detection_prob=0.30, altruist_escape_prob=0.90,
+        predator_hunt_capacity=1, seed=42,
+    ),
+    herbivore_specs=_herbivore_specs,
+    predator_specs=_predator_specs,
+)
 
-    In this experiment, we start with a population of creatures that have either the CowardGene or the AltruistGene.
-    """
-
-    @property
-    def name(self) -> str:
-        return "Experiment 2: Pure Cowardice vs Pure Altruism"
-
-    @property
-    def description(self) -> str:
-        return (
-            "All creatures carry either the CowardGene or the AltruistGene.\n"
-            "This experiment serves as a baseline for the effectiveness of cowardice and altruism as defense mechanisms against predation."
-        )
-
-    @property
-    def config(self) -> SimulationConfig:
-        return configuration
-
-    @property
-    def population_specs(self) -> list[tuple[callable, float]]:
-        return [
-            (lambda: [CowardGene()], 0.5),  # 50% CowardGene
-            (lambda: [AltruistGene()], 0.5),  # 50% AltruistGene
-        ]
+exp2c = SimpleExperiment(
+    name="Experimento 2C — Cobardía vs Altruismo (p_escape=0.90, 30 corridas)",
+    description="Validación estadística de 2B: 30 corridas con semillas distintas (base_seed=0).",
+    config=SimulationConfig(
+        num_trees=25, tree_capacity_min=2, tree_capacity_max=2,
+        num_generations=200, initial_population=80, initial_predators=8,
+        offspring_min=1, offspring_max=2,
+        predator_offspring_min=1, predator_offspring_max=2,
+        base_detection_prob=0.30, altruist_escape_prob=0.90,
+        predator_hunt_capacity=1, seed=0,
+    ),
+    herbivore_specs=_herbivore_specs,
+    predator_specs=_predator_specs,
+)

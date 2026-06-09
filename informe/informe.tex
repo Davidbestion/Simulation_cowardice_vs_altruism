@@ -15,7 +15,7 @@
 \geometry{margin=1in}
 \hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
 
-\title{Proyecto de Simulaci\'on: cobard\'ia vs altruismo}
+\title{Proyecto de Simulaci\'on: estrategias evolutivas bajo presi\'on de depredaci\'on}
 \author{David S\'anchez Iglesias}
 \date{mayo de 2026}
 
@@ -31,7 +31,7 @@
   \vspace{2cm}
   \rule{\linewidth}{0.5pt}\\[0.4cm]
   {\LARGE \textbf{Proyecto de Simulaci\'on}}\\[0.3cm]
-  {\large \textit{Cobard\'ia vs altruismo}}\\[0.2cm]
+  {\large \textit{Estrategias evolutivas bajo presi\'on de depredaci\'on}}\\[0.2cm]
   \rule{\linewidth}{0.5pt}
 
   \vspace{1.5cm}
@@ -59,211 +59,400 @@
 
 \section{Introducci\'on}
 
-Este trabajo estudia, mediante simulaci\'on computacional basada en agentes, la competencia evolutiva
-entre estrategias de cooperaci\'on y de conducta ego\'ista en un entorno con depredaci\'on y recursos limitados.
-El problema central es cl\'asico en biolog\'ia evolutiva: bajo qu\'e condiciones el altruismo puede mantenerse
-cuando comparte poblaci\'on con individuos que se benefician sin asumir costes.
+Este trabajo estudia, mediante simulaci\'on computacional basada en agentes, la competencia y coevoluci\'on
+de distintas estrategias de conducta en un ecosistema con depredaci\'on activa y recursos limitados.
+El punto de partida es la pregunta cl\'asica de la biolog\'ia evolutiva: bajo qu\'e condiciones puede mantenerse
+el altruismo cuando comparte poblaci\'on con individuos que se benefician sin asumir costes.
+Sin embargo, el estudio se extiende considerablemente m\'as all\'a: se incorporan mecanismos de camuflaje en
+herb\'ivoros y depredadores, estrategias de agrupamiento social, se\~nales de reconocimiento y una poblaci\'on
+de depredadores con genoma propio que coevoluciona con la presa.
 
-El proyecto modela poblaciones de criaturas cuyo comportamiento emerge de su genoma, compuesto por genes
-que determinan tanto rasgos observables (por ejemplo, la se\~nal de barba verde) como reglas de acci\'on
-ante depredadores. Sobre esa base se comparan estrategias de cobard\'ia, altruismo puro y altruismo selectivo,
-analizando su efecto sobre la supervivencia, la reproducci\'on y la frecuencia g\'enica a lo largo del tiempo.
+El modelo implementado simula dos poblaciones independientes ---herb\'ivoros y depredadores--- cuyo comportamiento
+emerge de su genoma. Los genes de los herb\'ivoros pueden definir estrategias de reacci\'on ante el peligro
+(cobard\'ia, altruismo puro, altruismo selectivo con barba verde), rasgos de camuflaje que dificultan la
+detecci\'on, o preferencias de agrupamiento (social o solitario). Los genes de los depredadores determinan
+c\'omo eligen los \'arboles donde cazar ---estrategias de emboscada sobre grupos, caza cautelosa sobre
+solitarios--- y si poseen camuflaje que reduce la probabilidad de ser detectados por la presa. Ambas
+poblaciones se reproducen y evolucionan de forma independiente en cada generaci\'on, dando lugar a
+din\'amicas de coevoluci\'on presa--depredador.
 
-El objetivo del informe es doble: (i) describir con precisi\'on el modelo implementado y el dise\~no experimental,
-y (ii) discutir qu\'e patrones son robustos y cu\'ales dependen de la estocasticidad de ejecuciones individuales.
-De este modo, el estudio conecta la implementaci\'on del simulador con la interpretaci\'on evolutiva de los resultados.
+El objetivo del informe es triple: (i) describir el modelo y la arquitectura del simulador;
+(ii) presentar el dise\~no de los nueve experimentos realizados, de complejidad creciente;
+y (iii) discutir los patrones evolutivos observados, distinguiendo resultados robustos de los
+dependientes de la estocasticidad. Los resultados cuantitativos completos, las gr\'aficas de
+evoluci\'on g\'enica y las tablas de fijaci\'on y extinci\'on por experimento se encuentran en
+el cuaderno de experimentaci\'on \texttt{experimentacion\_core.ipynb}.
 
 \section{Modelo}
 
 \subsection{Entidades y estado del sistema}
 
-El sistema est\'a formado por una poblaci\'on de criaturas y un entorno discreto de \'arboles. Cada criatura posee
-un \textit{genoma} (lista de genes) del que se derivan sus rasgos f\'isicos y su comportamiento frente al depredador.
-En la implementaci\'on actual, el rasgo f\'isico relevante es \texttt{green\_beard}, utilizado por estrategias de
-cooperaci\'on selectiva para decidir a qui\'en beneficiar.
+El sistema consta de tres tipos de entidades: \textbf{herb\'ivoros}, \textbf{depredadores} y \textbf{\'arboles}.
 
-El entorno contiene \texttt{num\_trees} \'arboles, cada uno con capacidad m\'axima de 2 criaturas por generaci\'on.
-La presencia de un depredador en cada \'arbol se modela como una variable Bernoulli independiente con probabilidad
-\texttt{predator\_probability}. Por tanto, en cada generaci\'on la mortalidad resulta de dos mecanismos:
-\textit{hambre} (exceso de poblaci\'on respecto a la capacidad total) y \textit{depredaci\'on}.
+Cada herb\'ivoro posee un \textit{genoma} (lista de genes) del que se derivan:
+\begin{itemize}
+    \item \texttt{physical\_traits}: rasgos f\'isicos como \texttt{green\_beard} (se\~nal de reconocimiento),
+    \texttt{hidden\_from\_predator} (invisibilidad ante la elecci\'on de \'arbol del depredador)
+    y \texttt{hunt\_evasion} (probabilidad adicional de evadir la caza una vez iniciada).
+    \item \texttt{behavioral\_traits}: preferencias de asignaci\'on a \'arboles
+    (buscar \'arboles con m\'as o menos ocupantes seg\'un la estrategia social).
+    \item Comportamiento ante depredador: resoluci\'on del enfrentamiento cuando hay un depredador en el \'arbol.
+\end{itemize}
+
+De forma an\'aloga, cada depredador posee su propio genoma, que puede definir:
+\begin{itemize}
+    \item Estrategia de elecci\'on de \'arbol (\texttt{predator\_choose\_tree}): por ejemplo, elegir
+    el \'arbol m\'as poblado (emboscada) o el menos poblado (caza cautelosa).
+    \item Rasgos f\'isicos como \texttt{camouflage\_factor}, que reduce la probabilidad de ser
+    detectado por los herb\'ivoros.
+\end{itemize}
+
+El entorno contiene \texttt{num\_trees} \'arboles. La capacidad m\'axima de alimentaci\'on de cada \'arbol
+se sortea al inicio de cada generaci\'on entre \texttt{tree\_capacity\_min} y \texttt{tree\_capacity\_max}.
+La mortalidad por generaci\'on resulta de dos mecanismos: \textit{hambre} (exceso de poblaci\'on respecto a
+la capacidad total de los \'arboles) y \textit{depredaci\'on}.
 
 \subsection{Din\'amica por generaci\'on}
 
-La simulaci\'on opera en generaciones no solapadas. En cada generaci\'on se ejecutan, en orden, las siguientes fases:
+La simulaci\'on opera en generaciones no solapadas. En cada generaci\'on se ejecutan, en orden:
 
 \begin{enumerate}
-    \item \textbf{Asignaci\'on a \'arboles:} las criaturas se distribuyen aleatoriamente en slots de alimentaci\'on
-    (capacidad total igual a $2 \times \texttt{num\_trees}$). Si la poblaci\'on excede la capacidad, el excedente
+    \item \textbf{Asignaci\'on de herb\'ivoros a \'arboles:} cada herb\'ivoro elige un slot seg\'un
+    sus preferencias g\'enicas (social: prefiere \'arboles llenos; solitario: prefiere \'arboles vac\'ios;
+    sin preferencia: distribuci\'on aleatoria). Si la poblaci\'on excede la capacidad total, el excedente
     muere por hambre.
-    \item \textbf{Encuentro con depredador:} en cada \'arbol ocupado se determina si hay depredador.
-    Si no lo hay, todos sobreviven. Si lo hay y solo hay un ocupante, ese individuo muere.
-    Si hay dos ocupantes, uno act\'ua como detector y la resoluci\'on depende del comportamiento definido por sus genes.
-    \item \textbf{Reproducci\'on:} los supervivientes generan entre \texttt{offspring\_min} y
-    \texttt{offspring\_max} descendientes; los progenitores no pasan a la siguiente generaci\'on.
-    \item \textbf{Actualizaci\'on:} la nueva poblaci\'on queda formada por los descendientes y se registran
-    las m\'etricas de la generaci\'on (tama\~no poblacional, muertes por hambre, muertes por depredaci\'on y frecuencias g\'enicas).
+
+    \item \textbf{Asignaci\'on de depredadores a \'arboles:} cada depredador elige un \'arbol para cazar
+    seg\'un su estrategia g\'enica (\texttt{predator\_choose\_tree}). Los herb\'ivoros con el rasgo
+    \texttt{hidden\_from\_predator} no son visibles para esta elecci\'on.
+
+    \item \textbf{Detecci\'on y enfrentamiento:} en cada \'arbol con depredador, cada herb\'ivoro intenta
+    detectarlo de forma independiente con probabilidad
+    $p = \texttt{base\_detection\_prob} \times (1 - \texttt{camouflage\_factor}_\text{pred})$.
+    Si al menos uno detecta, se elige aleatoriamente un \textit{notificador} entre ellos y se ejecuta
+    su \texttt{predator\_behavior}. Si nadie detecta, el depredador caza libremente hasta su capacidad
+    (\texttt{predator\_hunt\_capacity}). Los herb\'ivoros con \texttt{hunt\_evasion} tienen una probabilidad
+    adicional de escapar durante la caza. El efecto de ``muchos ojos'' surge de forma natural:
+    $P(\text{detecci\'on grupal}) = 1-(1-p)^{N}$ para un grupo de $N$ herb\'ivoros.
+
+    \item \textbf{Reproducci\'on de herb\'ivoros:} los supervivientes generan entre
+    \texttt{offspring\_min} y \texttt{offspring\_max} descendientes con el mismo genoma;
+    los progenitores no pasan a la siguiente generaci\'on.
+
+    \item \textbf{Reproducci\'on de depredadores:} los depredadores que cazaron al menos una presa
+    generan entre \texttt{predator\_offspring\_min} y \texttt{predator\_offspring\_max} descendientes.
+    Los que no cazaron mueren de inanici\'on.
+
+    \item \textbf{Registro:} se computan las frecuencias g\'enicas de herb\'ivoros y depredadores por separado
+    y se almacena un \texttt{GenerationReport} con todas las m\'etricas de la generaci\'on.
 \end{enumerate}
 
 \subsection{Estrategias g\'enicas consideradas}
 
-Las criaturas dise\~nadas para este proyecto pueden portar genes que definen su comportamiento ante la presencia de un depredador en el \'arbol que ocupan.
-Dichos genes pueden implementar distintas estrategias, que se resumen a continuaci\'on:
+Los genes se dividen en dos grupos seg\'un la especie que los porta.
 
+\textbf{Genes de herb\'ivoros:}
 \begin{itemize}
-    \item \texttt{CowardGene}: el detector huye y los dem\'as ocupantes del \'arbol no sobreviven.
-    \item \texttt{AltruistGene}: el detector avisa a todos los dem\'as; su propia supervivencia ocurre con probabilidad
-    \texttt{altruist\_escape\_prob}.
-    \item \texttt{SelectiveAltruistGene}: el detector solo beneficia a individuos con \texttt{green\_beard}.
-    \item \texttt{GreenBeardGene}: aporta la se\~nal f\'isica \texttt{green\_beard} sin comportamiento altruista asociado.
+    \item \texttt{CowardGene}: el notificador huye; los dem\'as ocupantes del \'arbol mueren.
+    \item \texttt{AltruistGene}: avisa a todos; su propia supervivencia ocurre con probabilidad \texttt{altruist\_escape\_prob}.
+    \item \texttt{SelectiveAltruistGene}: altruismo selectivo solo hacia portadores de \texttt{green\_beard}.
+    \item \texttt{GreenBeardGene}: aporta la se\~nal f\'isica \texttt{green\_beard} sin comportamiento altruista.
     \item \texttt{GreenBeardAltruistGene}: combina se\~nal \texttt{green\_beard} y altruismo selectivo.
+    \item \texttt{CamouflageHerbivoreGene}: hace al herb\'ivoro invisible para la elecci\'on de \'arbol del depredador
+    (\texttt{hidden\_from\_predator}) y le confiere evasión durante la caza (\texttt{hunt\_evasion\,=\,0.4}).
+    \item \texttt{SocialGene}: prefiere \'arboles con m\'as ocupantes (agrupamiento social).
+    \item \texttt{SolitaryGene}: prefiere \'arboles con menos ocupantes (dispersi\'on solitaria).
+    \item \texttt{SocialGreenBeardAltruistGene}: gen compuesto; combina agrupamiento social,
+    se\~nal de barba verde y altruismo selectivo.
+    \item \texttt{SolitaryCowardGene}: gen compuesto; combina dispersi\'on solitaria y conducta cobarde.
 \end{itemize}
 
-Cuando una criatura posee m\'ultiples genes con comportamiento frente a depredador, se aplica una regla de prioridad
-(campo \texttt{PRIORITY}) y ejecuta el gen de mayor prioridad que produzca una resoluci\'on v\'alida.
+\textbf{Genes de depredadores:}
+\begin{itemize}
+    \item \texttt{CamouflagePredatorGene}: reduce la probabilidad de ser detectado por los herb\'ivoros
+    (\texttt{camouflage\_factor\,=\,0.6}).
+    \item \texttt{AmbushGene}: elige el \'arbol con m\'as herb\'ivoros visibles (emboscada en grupos).
+    \item \texttt{CautiousPredatorGene}: elige el \'arbol con menos herb\'ivoros visibles (caza solitaria).
+    \item \texttt{GreedyHunterGene}: aumenta el n\'umero de presas capturadas por visita.
+    \item \texttt{AmbushCamoGene}: gen compuesto; combina camuflaje extremo
+    (\texttt{camouflage\_factor\,=\,0.9}) con estrategia de emboscada en el \'arbol m\'as poblado.
+\end{itemize}
+
+Cuando una criatura posee m\'ultiples genes con comportamiento frente a depredador, se aplica una regla
+de prioridad (campo \texttt{PRIORITY}), ejecut\'andose el gen de mayor prioridad que produzca una
+resoluci\'on v\'alida.
 
 \subsection{Supuestos y alcance}
 
-El modelo asume herencia directa del genoma, sin mutaci\'on, con apareamiento impl\'icito y generaciones discretas.
-Asimismo, la asignaci\'on a \'arboles y la presencia de depredador se tratan como procesos aleatorios independientes
-entre generaciones. Bajo estos supuestos, el simulador no pretende reproducir una especie concreta, sino ofrecer
-un entorno controlado para estudiar estabilidad o colapso de estrategias cooperativas en funci\'on del coste individual,
-la composici\'on inicial y la estructura de se\~nales de reconocimiento.
+El modelo asume herencia directa del genoma sin mutaci\'on, con apareamiento impl\'icito y generaciones
+no solapadas (los progenitores no conviven con sus descendientes). La asignaci\'on a \'arboles y la
+detecci\'on del depredador son procesos estoc\'asticos independientes entre generaciones.
+
+Bajo estos supuestos, el simulador no pretende reproducir ninguna especie concreta, sino ofrecer un entorno
+controlado para estudiar c\'omo distintos rasgos ---cooperaci\'on, camuflaje, agrupamiento y especializaci\'on
+depredadora--- afectan a la estabilidad evolutiva y a la din\'amica coevolutiva presa--depredador.
+El alcance experimental abarca desde los mecanismos cl\'asicos de la teor\'ia del altruismo hasta fen\'omenos
+m\'as complejos como el suicidio evolutivo del depredador camuflado o la paradoja del agrupamiento social
+frente a depredadores especializados en grupos.
 
 \section{Implementaci\'on}
 \subsection{Estructura general del c\'odigo}
 
 El c\'odigo principal de la simulaci\'on se encuentra en \texttt{src/simulation/core} y est\'a organizado por responsabilidad:
 
+\begin{sloppypar}
 \begin{itemize}
-	\item \texttt{simulation.py}: definiciones de configuraci\'on (\texttt{SimulationConfig}), la interfaz \texttt{Experiment} y el registro por generaci\'on (\texttt{GenerationReport}).
-	\item \texttt{world.py}: definici\'on de \texttt{Tree} y \texttt{World} (capacidad de alimentaci\'on por \'arbol).
-	\item \texttt{creature.py}: clase \texttt{Creature} que encapsula el genoma, rasgos f\'isicos y de comportamiento y la interfaz para responder ante un depredador.
-	\item \texttt{genes.py}: implementaciones de los genes (p. ej. \texttt{CowardGene}, \texttt{AltruistGene}, \texttt{SelectiveAltruistGene}, \texttt{GreenBeardGene}, \texttt{GreenBeardAltruistGene}) y la API que deben seguir.
-	\item \texttt{simulator.py}: la l\'ogica del ciclo diurno / por generaci\'on y la recogida de \texttt{GenerationReport}.
+	\item \texttt{simulation.py}: configuraci\'on (\texttt{SimulationConfig}), contrato de experimento
+	(\texttt{Experiment}), registro diario (\texttt{DayReport}/\texttt{GenerationReport}) y \texttt{TreeInteractionLog}.
+	\item \texttt{world.py}: clases \texttt{Tree} y \texttt{World}.
+	\item \texttt{creature.py}: clases \texttt{Creature}, \texttt{Herbivore} y \texttt{Predator}.
+	\item \texttt{genes.py}: la API base \texttt{Gene} y las implementaciones de los 10 genes
+	de herb\'ivoros y 5 genes de depredadores descritos en la
+	secci\'on~\ref{subsec:genes}.
+	\item \texttt{simulator.py}: ciclo diurno y recogida de \texttt{DayReport}.
 \end{itemize}
+\end{sloppypar}
 
 En adici\'on, la carpeta \texttt{src/simulation/instances} contiene los experimentos y sus generadores de genomas, y \texttt{src/simulation/analysis} las funciones de visualizaci\'on.
 
 \subsection{Mundo y \'arboles}
 
-El entorno se modela con la clase \texttt{Tree} (archivo \texttt{world.py}). Cada \texttt{Tree} tiene:
+El entorno se modela con las clases \texttt{Tree} y \texttt{World} (archivo \texttt{world.py}).
+Cada \texttt{Tree} tiene dos atributos:
 \begin{itemize}
-	\item \texttt{tree\_id}: identificador int.
-	\item \texttt{max\_capacity}: n\'umero m\'aximo de criaturas que pueden alimentarse (por defecto 2).
-	\item \texttt{has\_predator}: bandera booleana que indica si en ese d\'ia hubo un depredador.
+	\item \texttt{tree\_id}: identificador entero único dentro del mundo.
+	\item \texttt{capacity}: m\'aximo de herb\'ivoros que pueden alimentarse en ese \'arbol por d\'ia.
 \end{itemize}
 
-La clase \texttt{World} agrupa la colecci\'on de \texttt{Tree} y proporciona utilidades como la capacidad total (\texttt{total\_tree\_capacity}). El \texttt{Simulator} crea una lista de \texttt{Tree} cada generaci\'on basada en \texttt{cfg.num\_trees}.
+La clase \texttt{World} agrupa la colección de \'arboles y expone:
+\begin{itemize}
+	\item \texttt{num\_trees} (propiedad): n\'umero total de \'arboles.
+	\item \texttt{total\_capacity()} (m\'etodo): suma de las capacidades de todos los \'arboles.
+	\item \texttt{World.create(num\_trees, capacity\_min, capacity\_max, rng)}: m\'etodo est\'atico que construye
+	un nuevo mundo sorteando la capacidad de cada \'arbol de forma independiente.
+\end{itemize}
+
+El mundo se crea \textbf{una sola vez} al inicio de la simulaci\'on (antes del primer d\'ia) y sus
+\'arboles permanecen fijos durante toda la ejecuci\'on.
 
 \subsection{Criaturas y genoma}
 
-Cada criatura es una instancia de \texttt{Creature} (archivo \texttt{creature.py}) construida con un \texttt{genome}, que es una lista de instancias de \texttt{Gene}.
+Hay dos subclases concretas de \texttt{Creature} (archivo \texttt{creature.py}): \texttt{Herbivore} y
+\texttt{Predator}. Ambas se construyen a partir de un \texttt{genome} (lista de instancias de \texttt{Gene})
+y comparten la misma interfaz de rasgos:
 
-Al inicializarse, \texttt{Creature} calcula dos diccionarios derivados iterando sobre su genoma:
 \begin{itemize}
-	\item \texttt{physical\_traits}: resultado de llamar \texttt{gene.apply\_physical\_traits(creature)} para cada gen.
-	\item \texttt{behavioral\_traits}: resultado de \texttt{gene.apply\_behavioral\_traits(creature)}.
+	\item \texttt{physical\_traits}: diccionario acumulado llamando \texttt{gene.apply\_physical\_traits(creature)}
+	sobre cada gen del genoma.  Es el \'unico dict de rasgos; no existe un dict separado de rasgos de comportamiento.
+	\item \texttt{has\_trait(trait)}: devuelve \texttt{True} si el rasgo existe y tiene valor \textit{truthy}.
+	\item \texttt{get\_trait\_value(trait, default)}: devuelve el valor num\'erico del rasgo
+	(\'util para rasgos como \texttt{hunt\_evasion} o \texttt{camouflage\_factor}).
+	\item \texttt{has\_gene(gene\_type)}: comprueba si hay al menos una instancia del tipo de gen en el genoma.
 \end{itemize}
 
-Estos diccionarios permiten consultas r\'apidas con \texttt{has\_trait(trait)} y facilitan que genes distintos aporten rasgos (por ejemplo \texttt{green\_beard}).
+\texttt{Creature.reproduce(rng)} crea los descendientes al final del d\'ia: el n\'umero se sortea en
+\texttt{[min\_offspring, max\_offspring]} usando \texttt{rng}; los descendientes heredan el genoma
+completo sin modificaci\'on (no hay mutaci\'on ni recombinaci\'on).
 
-Adicionalmente \texttt{Creature} expone \texttt{has\_gene(gene\_type)} para comprobar si en el genoma hay una instancia de cierta clase de gen.
+\subsection{Genes y comportamientos}\label{subsec:genes}
 
-\subsection{Genes y comportamientos}
-
-El contrato de un gen est\'a definido por la clase abstracta \texttt{Gene} (archivo \texttt{genes.py}). Los puntos clave son:
+El contrato de un gen est\'a definido por la clase abstracta \texttt{Gene} (archivo \texttt{genes.py}).
+Los atributos de clase y m\'etodos sobreescribibles son:
 \begin{itemize}
-	\item \texttt{name}: nombre legible del gen (usado en contadores de frecuencia).
-	\item \texttt{PRIORITY}: entero que indica prioridad cuando varios genes implementan \texttt{predator\_behavior}.
-	\item \texttt{apply\_physical\_traits(creature)}: devuelve cambios de rasgos f\'isicos.
-	\item \texttt{apply\_behavioral\_traits(creature)}: devuelve rasgos de comportamiento.
-	\item \texttt{predator\_behavior(notifier, assigned, cfg)}: opcional; debe devolver \texttt{(survivors, eaten\_count)} o \texttt{None} si no aplica.
+	\item \texttt{name}: nombre del gen (clave en los contadores de frecuencia g\'enica).
+	\item \texttt{PRIORITY}: entero; mayor prioridad se evalúa primero cuando varios genes compiten.
+	\item \texttt{apply\_physical\_traits(creature)} $\to$ \texttt{dict}: rasgos f\'isicos que aporta el gen
+	(\texttt{\{\}} por defecto, sin efecto).
+	\item \texttt{choose\_tree(creature, available\_trees, all\_assignments, cfg, rng)} $\to$ \texttt{int|None}:
+	preferencia de \'arbol del herb\'ivoro; \texttt{None} para deferir al siguiente gen.
+	\item \texttt{predator\_behavior(notifier, assigned, cfg, rng)}
+	$\to$ \texttt{(fled, directly\_eaten)|None}:
+	respuesta del herb\'ivoro al detectar un depredador; ambas listas contienen instancias de
+	\texttt{Herbivore}; \texttt{None} para deferir.
+	\item \texttt{predator\_choose\_tree(predator, trees, visible\_herbivores, cfg, rng)} $\to$ \texttt{int|None}:
+	elecci\'on de \'arbol del depredador; \texttt{None} para deferir.
+	\item \texttt{modify\_hunt\_capacity(predator, current\_capacity, cfg)} $\to$ \texttt{int}:
+	ajuste del n\'umero m\'aximo de presas que captura el depredador por visita.
 \end{itemize}
 
-Implementaciones concretas relevantes:
+La API de \texttt{Gene} se ha extendido respecto al dise\~no original para soportar tanto herb\'ivoros como depredadores:
 \begin{itemize}
-	\item \texttt{CowardGene} (\texttt{PRIORITY=10}): el notificante huye y los dem\'as mueren (salvando al notificante).
-	\item \texttt{AltruistGene} (\texttt{PRIORITY=20}): al avisar, todos los dem\'as escapan; el notificante escapa con probabilidad \texttt{cfg.altruist\_escape\_prob}.
-	\item \texttt{SelectiveAltruistGene} (\texttt{PRIORITY=25}): altruismo selectivo solo hacia criaturas con \texttt{green\_beard}.
+	\item \texttt{predator\_choose\_tree(predator, trees, visible\_herbivores, cfg, rng)}: solo para depredadores;
+	devuelve el \texttt{tree\_id} elegido para cazar.
+	\item \texttt{choose\_tree(creature, available\_trees, all\_assignments, cfg, rng)}: para herb\'ivoros con
+	preferencias de asignaci\'on (social, solitario).
+\end{itemize}
+
+\textbf{Genes de herb\'ivoros implementados:}
+\begin{itemize}
+	\item \texttt{CowardGene} (\texttt{PRIORITY=10}): el notificante huye; los dem\'as mueren.
+	\item \texttt{AltruistGene} (\texttt{PRIORITY=20}): avisa a todos; escapa con probabilidad \texttt{altruist\_escape\_prob}.
+	\item \texttt{SelectiveAltruistGene} (\texttt{PRIORITY=25}): altruismo selectivo hacia portadores de \texttt{green\_beard}.
 	\item \texttt{GreenBeardGene} (\texttt{PRIORITY=5}): aporta el rasgo f\'isico \texttt{green\_beard}.
-	\item \texttt{GreenBeardAltruistGene} (\texttt{PRIORITY=30}): combina \texttt{green\_beard} + comportamiento altruista (prioridad alta).
+	\item \texttt{GreenBeardAltruistGene} (\texttt{PRIORITY=30}): combina \texttt{green\_beard} + altruismo selectivo.
+	\item \texttt{CamouflageHerbivoreGene} (\texttt{PRIORITY=10}): \texttt{hidden\_from\_predator=True},
+	\texttt{hunt\_evasion=0.4}; comportamiento cobarde.
+	\item \texttt{SocialGene}: \texttt{choose\_tree} elige el \'arbol con m\'as ocupantes.
+	\item \texttt{SolitaryGene}: \texttt{choose\_tree} elige el \'arbol con menos ocupantes.
+	\item \texttt{SocialGreenBeardAltruistGene} (\texttt{PRIORITY=35}): gen compuesto; social + barba verde + altruismo selectivo.
+	\item \texttt{SolitaryCowardGene} (\texttt{PRIORITY=35}): gen compuesto; solitario + cobarde.
 \end{itemize}
 
-El dise\~no de \texttt{predator\_behavior} permite que si una criatura posee m\'ultiples genes que definen comportamiento ante depredador,
-	\texttt{Creature.handle\_predator} ordene dichos genes por \texttt{PRIORITY} (descendente) y ejecute en ese orden hasta que uno devuelva una resoluci\'on.
+\textbf{Genes de depredadores implementados:}
+\begin{itemize}
+	\item \texttt{CamouflagePredatorGene} (\texttt{PRIORITY=10}): \texttt{camouflage\_factor=0.6}.
+	\item \texttt{AmbushGene} (\texttt{PRIORITY=15}): \texttt{predator\_choose\_tree} elige el \'arbol m\'as poblado.
+	\item \texttt{CautiousPredatorGene} (\texttt{PRIORITY=15}): \texttt{predator\_choose\_tree} elige el \'arbol menos poblado.
+	\item \texttt{GreedyHunterGene} (\texttt{PRIORITY=10}): aumenta \texttt{predator\_hunt\_capacity}.
+	\item \texttt{AmbushCamoGene} (\texttt{PRIORITY=20}): gen compuesto; \texttt{camouflage\_factor=0.9} + emboscada en grupo m\'as poblado.
+\end{itemize}
+
+\texttt{Creature.handle\_predator} ordena los genes que implementan \texttt{predator\_behavior} por \texttt{PRIORITY}
+descendente y ejecuta en ese orden hasta obtener una resoluci\'on v\'alida.
 
 \subsection{Ciclo de simulaci\'on (por generaci\'on)}
 
 La clase \texttt{Simulator} (archivo \texttt{simulator.py}) implementa el ciclo principal en \texttt{run()}:
 \begin{enumerate}
-	\item (Opcional) inicializaci\'on del RNG con \texttt{cfg.seed} para reproducibilidad.
-	\item Llamada a \texttt{\_initialize\_population()} que usa \texttt{experiment.population\_specs} para construir la poblaci\'on inicial (vease m\'as abajo).
+	\item Inicializaci\'on del RNG con \texttt{cfg.seed} (si no es \texttt{None}) para reproducibilidad.
+	\item Creaci\'on del \texttt{World} con \texttt{World.create()} (\'unica vez en toda la simulaci\'on).
+	\item Llamadas a \texttt{\_build\_population()} usando \texttt{experiment.herbivore\_specs} y
+	\texttt{experiment.predator\_specs} para construir las poblaciones iniciales.
 	\item Bucle de generaciones \texttt{for gen in 1..cfg.num\_generations}:
 		\begin{enumerate}
-			\item Crear \texttt{Tree} objetos y el \texttt{World} para esta generaci\'on.
-			\item Calcular \texttt{total\_capacity} sumando \texttt{tree.max\_capacity}.
-			\item Asignar criaturas a slots de \texttt{Tree} (ver secci\'on siguiente). Si la poblaci\'on excede la capacidad, algunos mueren por hambre (\texttt{starved}).
-			\item Para cada \texttt{Tree} con ocupantes:
-				\begin{itemize}
-					\item Determinar si hay depredador: \texttt{t.has\_predator = random.random() < cfg.predator\_probability}.
-					\item Si no hay depredador, todos los asignados sobreviven.
-					\item Si hay depredador:
-						\begin{itemize}
-							\item Si solo hay un ocupante, ese muere (\texttt{eaten += 1}).
-							\item Si hay m\'as de uno, se elige aleatoriamente un \texttt{detector} entre los asignados y se llama \texttt{detector.handle\_predator(assigned, cfg)}. Esta funci\'on delega en los genes (priorizados) y devuelve la lista de \texttt{survivors} y \texttt{eaten\_count}.
-						\end{itemize}
-				\end{itemize}
-			\item Los supervivientes se reproducen: por cada superviviente se llama \texttt{Creature.reproduce()} que genera N descendientes (\texttt{random.randint(cfg.offspring\_min, cfg.offspring\_max)}). Los progenitores no se mantienen (morir\'ian al final del d\'ia), por tanto la nueva poblaci\'on est\'a formada solo por los descendientes.
-			\item Se computan las frecuencias genicas en la nueva poblaci\'on y se crea un \texttt{GenerationReport} con las m\'etricas de la generaci\'on.
-			\item Si la poblaci\'on queda vac\'ia, el bucle termina anticipadamente.
+			\item Crear el \texttt{World} y los objetos \texttt{Tree} para esta generaci\'on;
+			la capacidad por \'arbol se sortea entre \texttt{tree\_ca\-pa\-ci\-ty\_min}
+			y \texttt{tree\_ca\-pa\-ci\-ty\_max}.
+			\item Asignar herb\'ivoros a \'arboles seg\'un sus preferencias g\'enicas
+			(\texttt{choose\_tree}). Si la poblaci\'on excede la capacidad total, el excedente muere
+			por hambre (\texttt{starved}).
+			\item Asignar depredadores a \'arboles seg\'un \texttt{predator\_choose\_tree}; los
+			herb\'ivoros con \texttt{hidden\_from\_predator} no son visibles en esta fase.
+			\item Para cada \'arbol con al menos un depredador, resolver el enfrentamiento
+			(detecci\'on independiente por herb\'ivoro, notificaci\'on, caza libre si no hay
+			detecci\'on) seg\'un se describe en la secci\'on~\ref{subsec:pred}.
+			\item Los herb\'ivoros supervivientes se reproducen con \texttt{Creature.reproduce()};
+			los progenitores no pasan a la siguiente generaci\'on.
+			\item Los depredadores que cazaron al menos una presa se reproducen; los que no cazaron
+			mueren de inanici\'on.
+			\item Se computan las frecuencias g\'enicas de herb\'ivoros y depredadores y se almacena
+			un \texttt{GenerationReport}. Si alguna poblaci\'on queda vac\'ia, el bucle puede
+			terminar anticipadamente.
 		\end{enumerate}
 \end{enumerate}
 
-\subsection{Asignaci\'on de criaturas a \'arboles}
+\subsection{Asignaci\'on de herb\'ivoros a \'arboles}
 
-La asignaci\'on se realiza en dos modos seg\'un la relaci\'on entre la poblaci\'on y la capacidad total:
-\begin{itemize}
-	\item Si \texttt{population\_start > total\_capacity}: se consideran \texttt{starved = population\_start - total\_capacity}. Se baraja la poblaci\'on (\texttt{random.shuffle}) y se seleccionan los \texttt{total\_capacity} que est\'an permitidos para alimentarse; estos se distribuyen llenando cada \'arbol hasta su capacidad.
-	\item Si \texttt{population\_start <= total\_capacity}: se construye una lista de \texttt{slots} repitiendo cada \texttt{tree\_id} \texttt{max\_capacity} veces y se elige aleatoriamente \texttt{population\_start} slots con \texttt{random.sample(slots, k=population\_start)}. Cada criatura se asigna a un slot elegido.
-\end{itemize}
+La asignaci\'on sigue un esquema greedy secuencial con orden aleatorio:
+\begin{enumerate}
+	\item Se baraja la lista de herb\'ivoros (\texttt{rng.shuffle}) para eliminar cualquier sesgo
+	sistem\'atico por orden de creaci\'on.
+	\item Cada herb\'ivoro, por turno, consulta su gen de elecci\'on (\texttt{choose\_tree})
+	recibiendo \'unicamente los \'arboles que a\'un tienen capacidad libre.
+	Si el gen devuelve un \'arbol ya lleno (caso de seguridad), se redirige a uno aleatorio
+	entre los disponibles.
+	\item El herb\'ivoro ocupa un slot del \'arbol elegido, reduciendo en 1 su capacidad
+	restante.
+	\item Si en el momento de su turno no queda ning\'un slot libre en ning\'un \'arbol,
+	el herb\'ivoro muere de hambre y no participa en ninguna fase posterior.
+\end{enumerate}
 
-Esta estrategia asegura que la asignaci\'on sea aleatoria, pero que respete la capacidad por \'arbol y el caso en que la poblaci\'on exceda dicha capacidad (muerte por hambre).
+Este mecanismo garantiza que la capacidad por \'arbol se respete y que la hambruna surja de forma natural cuando la poblaci\'on supera la suma de capacidades, sin necesidad de calcular el excedente expl\'icitamente.
 
-\subsection{Depredadores y detecci\'on}
+\subsection{Depredadores y detecci\'on}\label{subsec:pred}
 
-La presencia de un depredador en un \'arbol se decide por evento Bernoulli con probabilidad \texttt{cfg.predator\_probability} por \'arbol (se eval\'ua cada generaci\'on). Si hay depredador y hay m\'as de una criatura en el \'arbol, se
-escoge un \texttt{detector} aleatorio y se delega en \texttt{detector.handle\_predator} la resoluci\'on del enfrentamiento.
+En el modelo extendido, los depredadores son agentes activos con genoma propio. En cada generaci\'on, cada
+depredador elige un \'arbol seg\'un su \texttt{predator\_choose\_tree}: los herb\'ivoros con el rasgo
+\texttt{hidden\_from\_predator} no son visibles para esta elecci\'on y no influyen en ella.
 
-\texttt{Creature.handle\_predator} implementa la l\'ogica de resoluci\'on por genes: agrupa los genes que implementan \texttt{predator\_behavior}, los ordena por \texttt{PRIORITY} en orden descendente y ejecuta cada uno hasta obtener una respuesta no nula. Si ning\'un gen define comportamiento, la implementaci\'on por defecto devuelve \texttt{([], len(assigned))} (todos muertos).
+Una vez asignados los depredadores a \'arboles, se resuelve el enfrentamiento árbol a árbol:
+\begin{enumerate}
+    \item \textbf{Detecci\'on.} Se calcula la probabilidad efectiva de detecci\'on como
+    $p_\text{eff} = p_\text{base} \cdot (1 - f_\text{camo\_max})$, donde $f_\text{camo\_max}$
+    es el \texttt{camouflage\_factor} del depredador \emph{m\'as camuflado} presente en el
+    \'arbol. Los herb\'ivoros se procesan en orden aleatorio; el \textbf{primero} que supera el
+    umbral $p_\text{eff}$ se convierte en el \textit{detector}.
+    \item \textbf{Alarma.} El detector ejecuta \texttt{handle\_predator()}, que devuelve
+    \texttt{(fled, directly\_eaten)}: herb\'ivoros que huyen antes de la caza y herb\'ivoros
+    devorados directamente (p.~ej.\ el altruista que se sacrifica). Los dem\'as permanecen
+    expuestos a la fase de caza.
+    \item \textbf{Caza.} Los depredadores atacan en orden aleatorio sobre los herb\'ivoros que
+    no huyeron ni fueron devorados directamente. Cada depredador captura hasta
+    \texttt{predator\_hunt\_capacity} presas (modificable por \texttt{modify\_hunt\_capacity});
+    cada presa puede escapar individualmente si posee \texttt{hunt\_evasion $> 0$}.
+    Las presas capturadas se retiran del pool antes del siguiente depredador.
+    \item Solo los depredadores que cazaron al menos una presa sobreviven y se reproducen.
+\end{enumerate}
 
-El formato devuelto por un gen es \texttt{(survivors, eaten\_count)} donde \texttt{survivors} es una lista de referencias a criaturas que escapan y \texttt{eaten\_count} indica cu\'antas son comidas por el depredador.
+El \texttt{GenerationReport} registra las frecuencias g\'enicas de herb\'ivoros y depredadores
+por separado (\texttt{gene\_frequencies} y \texttt{predator\_gene\_frequencies}).
 
 \subsection{Generaci\'on de genomas y experimento}
 
-Cada \texttt{Experiment} define \texttt{population\_specs}, una lista de tuplas \texttt{(genome\_factory, fraction)} donde \texttt{genome\_factory()} debe devolver una lista de instancias de \texttt{Gene} (el genoma) y \texttt{fraction} indica la fracci\'on de la poblaci\'on inicial que tendr\'a ese genoma. \texttt{\_initialize\_population()} convierte esas fracciones en conteos enteros, corrige errores de redondeo y construye \texttt{Creature(genome=...)} para cada individuo.
+Cada \texttt{Experiment} define dos propiedades de especificaci\'on de poblaciones:
+\begin{itemize}
+	\item \texttt{herbivore\_specs}: lista de tuplas \texttt{(genome\_factory, fraction)} para los
+	herb\'ivoros. \texttt{genome\_factory} es un callable sin argumentos que devuelve una lista de genes;
+	\texttt{fraction} es la proporci\'on de la poblaci\'on inicial que tendr\'a ese genoma.
+	\item \texttt{predator\_specs}: misma estructura para los depredadores (lista vac\'ia por defecto
+	si el experimento no tiene depredadores expl\'icitos).
+\end{itemize}
 
-Ejemplo: un experimento puede usar \texttt{lambda: [CowardGene()]} para crear individuos cuya lista \texttt{genome} contiene una sola instancia de \texttt{CowardGene}.
+\texttt{Simulator.\_build\_population()} convierte las fracciones en conteos enteros (con correcci\'on
+de redondeo en el \'ultimo subtipo) y construye las instancias de \texttt{Herbivore} o \texttt{Predator}.
+El alias \texttt{population\_specs} sigue funcionando por compatibilidad con c\'odigo anterior.
 
 \subsection{Reproducci\'on y manejo del genoma}
 
-La funci\'on \texttt{Creature.reproduce()} crea nuevos objetos \texttt{Creature} con el mismo campo \texttt{genome} que el progenitor. En la implementaci\'on actual, la lista del genoma se pasa tal cual a los descendientes; esto funciona si los genes son inmutables, pero se deber\'ia copiar el genoma si en el futuro se permitieran mutaciones a nivel de instancia.
+\texttt{Creature.reproduce(rng)} crea descendientes con \texttt{list(self.genome)}: se hace una copia
+superficial de la lista, lo que es suficiente mientras los genes sean objetos inmutables compartidos.
+Los progenitores no se incluyen en la lista devuelta; la nueva generaci\'on est\'a compuesta
+exclusivamente por los descendientes.
 
 \subsection{Inicializaci\'on, semilla y reproducibilidad}
 
-La clase \texttt{SimulationConfig} define los par\'ametros controlables: \texttt{num\_trees}, \texttt{num\_generations}, \texttt{initial\_population}, \texttt{predator\_probability}, \texttt{offspring\_min}, \texttt{offspring\_max} y \texttt{seed} (entre otros). \texttt{Simulator.run()} llama a \texttt{random.seed(cfg.seed)} cuando \texttt{seed} no es \texttt{None}, lo que permite reproducir ejecuciones.
+\texttt{SimulationConfig} agrupa todos los par\'ametros de la simulaci\'on. Los m\'as relevantes son:
+\texttt{num\_trees}, \texttt{tree\_capacity\_min/max}, \texttt{num\_generations},
+\texttt{initial\_population}, \texttt{initial\_predators}, \texttt{offspring\_min/max},
+\texttt{predator\_offspring\_min/max}, \texttt{base\_detection\_prob},
+\texttt{altruist\_escape\_prob}, \texttt{predator\_hunt\_capacity} y \texttt{seed}.
 
-En la utilidad \texttt{run.py} se implementa la l\'ogica para repetir un experimento varias veces (\texttt{--repeats}) y para controlar si cada repetici\'on debe ser determinista (semillas \texttt{base + i}) o no (semillas \texttt{None} para variar con el RNG del sistema).
+\texttt{Simulator.run()} instancia un \texttt{random.Random(cfg.seed)} propio (RNG aislado, no el
+global del m\'odulo \texttt{random}) y lo pasa expl\'icitamente a cada fase. Esto garantiza que
+dos ejecuciones con la misma semilla produzcan resultados id\'enticos con independencia del estado
+global del int\'erprete.
 
 \subsection{Reportes}
 
-Por cada generaci\'on \texttt{Simulator} construye un \texttt{GenerationReport} (definido en \texttt{simulation.py}) que contiene: \texttt{generation}, \texttt{population\_start}, \texttt{starved}, \texttt{eaten}, \texttt{survived}, \texttt{population\_end} y \texttt{gene\_frequencies} (mapa \texttt{nombre\_gene} -> fracci\'on relativa). Estos objetos se usan luego para generar las figuras y el an\'alisis agregado.
-
-\subsection{Notas de extensibilidad y consideraciones de implementaci\'on}
+Por cada d\'ia \texttt{Simulator} construye un \texttt{DayReport} (clase definida en
+\texttt{simulation.py}; el alias \texttt{GenerationReport} se mantiene por compatibilidad).
+Sus campos principales son:
 
 \begin{itemize}
-	\item La separaci\'on de responsabilidades facilita a\~nadir nuevos genes implementando \texttt{predator\_behavior} o \texttt{apply\_*\_traits}.
-	\item Si se desea permitir la mutaci\'on de genomas es recomendable clonar la lista \texttt{genome} en \texttt{Creature.reproduce()} para evitar aliasing entre instancias.
-	\item La asignaci\'on actual de depredadores es independiente por \'arbol y por d\'ia; puede extenderse para modelar depredadores locales con distribuciones no Bernoulli.
+	\item \texttt{generation} / \texttt{day}: n\'umero de d\'ia (base 1).
+	\item \texttt{population\_start}, \texttt{starved}, \texttt{eaten}, \texttt{survived},
+	\texttt{population\_end}: estad\'isticas de los herb\'ivoros.
+	\item \texttt{gene\_frequencies}: mapa \texttt{nombre\_gen $\to$ frecuencia} para herb\'ivoros.
+	\item \texttt{predator\_count\_start}, \texttt{predator\_count\_end}: tama\~no de la poblaci\'on
+	de depredadores al inicio y al final del d\'ia.
+	\item \texttt{predator\_gene\_frequencies}: frecuencias g\'enicas de los depredadores.
+	\item \texttt{tree\_interactions}: lista de \texttt{TreeInteractionLog}, uno por \'arbol con
+	herb\'ivoros, con el detalle de detecci\'on, alarma y caza de ese \'arbol ese d\'ia.
+\end{itemize}
+
+\subsection{Notas de extensibilidad}
+
+\begin{itemize}
+	\item A\~nadir un nuevo comportamiento requiere crear una subclase de \texttt{Gene} e implementar
+	los m\'etodos relevantes (\texttt{predator\_behavior}, \texttt{choose\_tree},
+	\texttt{predator\_choose\_tree}, \texttt{modify\_hunt\_capacity}); el resto del sistema
+	lo descubrir\'a autom\'aticamente por reflexi\'on (\texttt{hasattr}).
+	\item Si se introdujera mutaci\'on, \texttt{Creature.reproduce()} deber\'ia clonar en
+	profundidad los genes mutables para evitar aliasing entre generaciones.
+	\item El campo \texttt{predator\_probability} de \texttt{SimulationConfig} se conserva
+	por compatibilidad con configuraciones antiguas pero no es usado por el simulador extendido;
+	la probabilidad de encuentro con depredador la controla \texttt{base\_detection\_prob} junto
+	con las estrategias de elecci\'on de \'arbol de los depredadores.
 \end{itemize}
 
 % Fin de la seccion Implementacion
@@ -271,12 +460,11 @@ Por cada generaci\'on \texttt{Simulator} construye un \texttt{GenerationReport} 
 
 \graphicspath{{figuras/}}
 
-\section{Dise\~no Experimental}
+\section{Resultados experimentales}
 
-El dise\~no experimental sigue una l\'ogica de complejidad creciente: se parte de un escenario homog\'eneo de referencia,
-se introduce progresivamente la competencia entre estrategias, y se a\~naden mecanismos de reconocimiento y cooperaci\'on selectiva
-para examinar bajo qu\'e condiciones el altruismo puede mantenerse evolutivamente.
-Los par\'ametros comunes a todas las simulaciones se recogen en la Tabla~\ref{tab:params}.
+Los experimentos se dise\~naron con una l\'ogica de complejidad creciente: partiendo de un escenario homog\'eneo de referencia,
+se introdujo progresivamente la competencia entre estrategias y se a\~nadieron mecanismos de camuflaje, reconocimiento y cooperaci\'on selectiva.
+Los par\'ametros del entorno son comunes a todos los experimentos salvo indicaci\'on contraria (Tabla~\ref{tab:params}).
 
 \begin{table}[H]
 \centering
@@ -295,377 +483,63 @@ Semilla aleatoria (\texttt{seed})              & 42 \\
 \end{tabular}
 \end{table}
 
-\subsection{Estudio 1: l\'inea base de cobard\'ia pura}
+El dise\~no experimental abarca nueve experimentos de complejidad creciente.
+Los tres primeros estudian la din\'amica de cobard\'ia pura, altruismo puro y altruismo selectivo con se\~nal de barba verde,
+respectivamente, variando la probabilidad de escape del altruista y la proporci\'on inicial de portadores.
+Los tres siguientes introducen el camuflaje como variable experimental: en herbívoros (Exp.~5),
+en depredadores (Exp.~6) y en ambas especies de forma simult\'anea (Exp.~7).
+Los dos \'ultimos experimentos exploran combinaciones m\'as complejas de estrategias sociales
+y especializaci\'on de nichos depredadores (Exp.~8 y~9).
 
-\textbf{Objetivo.} Caracterizar la din\'amica poblacional y de supervivencia bajo una estrategia \'unica
-para disponer de una referencia con la que comparar los estudios posteriores.
+El detalle completo del dise\~no, los par\'ametros por combinaci\'on, los resultados num\'ericos y las
+conclusiones de cada experimento se encuentran en el cuaderno de experimentaci\'on:
+\texttt{experimentacion\_core.ipynb}, incluido en el repositorio del proyecto.
+Dicho cuaderno documenta 30 corridas independientes por combinaci\'on, las gr\'aficas de evoluci\'on
+gen\'etica y coevolución poblacional, y las tablas de fijaci\'on y extinción por experimento.
 
-\textbf{Condiciones.} Se simula una poblaci\'on homog\'enea de individuos portadores de \texttt{CowardGene},
-con 100 generaciones y $p_\text{escape}=0{,}50$ (configuraci\'on por defecto).
-Se realiza una \'unica ejecuci\'on, suficiente para observar la din\'amica estacionaria.
+A continuaci\'on se presenta una discusi\'on global de los patrones observados.
 
-\subsection{Estudio 2: viabilidad del altruismo puro frente a la cobard\'ia}
+\section{Discusi\'on global}
 
-\textbf{Objetivo.} Determinar si el altruismo puro puede coexistir con o desplazar a la cobard\'ia,
-y c\'omo var\'ia ese resultado al modificar la ventaja individual del altruista ($p_\text{escape}$).
+\subsection{Inestabilidad del altruismo puro y condiciones para el altruismo selectivo}
 
-\textbf{Condiciones.} La poblaci\'on inicial se divide al 50\,\% entre \texttt{CowardGene} y \texttt{AltruistGene}.
-El individuo altruista avisa a todos los compa\~neros de \'arbol al detectar un depredador,
-incurriendo en el riesgo de ser comido con probabilidad $1 - p_\text{escape}$.
-Se contemplan dos valores del par\'ametro $p_\text{escape}$:
-
-\begin{itemize}
-    \item $p_\text{escape}=0{,}50$, durante 100 generaciones (1 ejecuci\'on exploratoria).
-    \item $p_\text{escape}=0{,}90$, durante 200 generaciones.
-    Para este segundo valor, se realizan primero una ejecuci\'on individual para observar la trayectoria concreta
-    y a continuaci\'on 30 ejecuciones independientes para estimar la variabilidad entre runs
-    y confirmar la robustez estad\'istica del resultado.
-\end{itemize}
-
-\subsection{Estudio 3: altruismo selectivo con se\~nal de reconocimiento}
-
-\textbf{Objetivo.} Estudiar si el altruismo puro puede volverse evolutivamente estable cuando se lo dota de un mecanismo de
-reconocimiento: la se\~nal f\'isica de barba verde (\textit{green beard}), que permite al individuo altruista cooperar
-exclusivamente con otros portadores de esa misma se\~nal.
-Una vez confirmada la viabilidad del mecanismo en la distribuci\'on por defecto (50\,\% de altruistas),
-se examina c\'omo influyen dos factores en su estabilidad: la proporci\'on inicial de altruistas en la poblaci\'on y el coste
-individual del altruismo ($p_\text{escape}$).
-
-\textbf{Condiciones.} En todas las condiciones de este estudio el \texttt{GreenBeardAltruistGene} mantiene la se\~nal y el
-comportamiento altruista completamente acoplados: todo individuo con barba verde es altruista selectivo y viceversa.
-Se var\'ian dos factores de forma cruzada, dando lugar a seis condiciones simuladas con 30 ejecuciones cada una (200 generaciones):
-
-\begin{enumerate}
-    \item \textbf{Probabilidad de escape} ($p_\text{escape}$): 0{,}10 (coste alto del altruismo), 0{,}50 (coste moderado), 0{,}90 (coste bajo).
-    \item \textbf{Proporci\'on inicial de altruistas selectivos}: 50\,\% de altruistas frente a 10\,\% de altruistas
-    (con el 90\,\% o el 50\,\% restante compuesto por cobardes puros, respectivamente).
-\end{enumerate}
-
-Esta combinaci\'on $3 \times 2$ permite separar el efecto de $p_\text{escape}$ del efecto de la proporci\'on inicial
-sobre la din\'amica de fijaci\'on o extinci\'on del gen altruista.
-
-\subsection{Estudio 4: competencia con se\~nal y comportamiento desacoplados}
-
-\textbf{Objetivo.} Examinar qu\'e sucede cuando la se\~nal de barba verde y la conducta altruista existen como genes independientes
-que pueden segregarse por separado en la poblaci\'on.
-En este escenario ninguna estrategia altruista tiene garant\'ia de que avisar a un portador de la se\~nal implique cooperaci\'on rec\'iproca.
-
-\textbf{Condiciones.} La poblaci\'on inicial se distribuye equitativamente al 25\,\% entre cuatro fenotipos:
-\texttt{CowardGene} (cobarde puro, sin se\~nal),
-\texttt{GreenBeardGene}+\texttt{CowardGene} (porta la se\~nal pero act\'ua como cobarde),
-\texttt{SelectiveAltruistGene} (altruismo selectivo hacia portadores de barba verde, sin poseer la se\~nal propia),
-y \texttt{GreenBeardAltruistGene} (porta la se\~nal y el altruismo selectivo acoplados).
-Se realizan 30 ejecuciones de 400 generaciones con $p_\text{escape}=0{,}50$,
-extendiendo el horizonte temporal para observar posibles dinámicas de largo plazo.
+Los experimentos 1--4 confirman que el altruismo puro es evolutivamente inestable: los cobardes explotan el aviso de peligro sin asumir coste, desplazando sistem\'aticamente a los altruistas independientemente de su probabilidad de escape (Exp.~2--4). El altruismo selectivo con se\~nal de barba verde supera este problema cuando se\~nal y comportamiento permanecen acoplados: la se\~nal garantiza que el coste se dirija exclusivamente hacia otros cooperadores, generando una ventaja neta sobre los cobardes (Exp.~3). Sin embargo, este mecanismo muestra dependencia de masa cr\'itica: cuando los altruistas parten de una minor\'ia del 10\,\%, la viabilidad depende del coste individual; con $p_\text{escape}$ baja, la escasez de encuentros entre portadores produce extinci\'on. El desacoplamiento total de se\~nal y conducta (Exp.~4) colapsa ambas estrategias altruistas antes de la generaci\'on 50, en consonancia con los modelos te\'oricos de barba verde~\cite{zahavi1975}.
 
 
-\section{Resultados}
+\subsection{Camuflaje y consecuencias diferenciales en herb\'ivoros y depredadores}
 
-\subsection{Prueba 1: din\'amica de la cobard\'ia pura}
+Introducir el camuflaje produce resultados asim\'etricos seg\'un la especie. En herb\'ivoros (Exp.~5), el camuflaje reduce la probabilidad de ser detectado y, combinado con estrategias sociales (Exp.~7--8), refuerza la supervivencia grupal. En depredadores (Exp.~6--9), el camuflaje produce el efecto opuesto: la mayor eficiencia depredadora depleta la presa m\'as r\'apido de lo que el ecosistema puede recuperarla, induciendo el colapso de la propia poblaci\'on depredadora ---un caso de suicidio evolutivo o ``paradoja de la eficiencia''---. La din\'amica de Lotka--Volterra subyacente amplifica esta inestabilidad: en poblaciones peque\~nas, las fluctuaciones estoc\'asticas llevan al depredador a la extinci\'on incluso cuando su adaptaci\'on individual es \'optima.
 
-La poblaci\'on hom\'og\'enea de cobardes (\texttt{Experiment1}, \texttt{default\_config}, 1 ejecuci\'on) muestra una din\'amica estable a lo largo de las 100 generaciones simuladas (Figura~\ref{fig:p1-pop}).
-El tama\~no poblacional al final de cada generaci\'on oscila entre aproximadamente 52 y 80 individuos,
-reflejando el equilibrio din\'amico entre reproducci\'on y mortalidad por depredaci\'on y por hambre.
-Este resultado establece la l\'inea base: bajo cobard\'ia pura la especie ni se extingue ni crece ilimitadamente,
-y la frecuencia del gen cobarde se mantiene en el 100\,\% durante toda la simulaci\'on.
+\subsection{Sociabilidad, cobard\'ia solitaria y la trampa de la depredaci\'on grupal}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.80\textwidth]{fig01_exp1_population.png}
-    \caption{Prueba~1 (\texttt{Experiment1}, \texttt{default\_config}): din\'amica poblacional durante 100 generaciones con cobard\'ia pura.}
-    \label{fig:p1-pop}
-\end{figure}
-
-\subsection{Prueba 2: cobard\'ia frente a altruismo puro ($p_\text{escape}=0{,}50$)}
-
-Introduciendo un 50\,\% de altruistas puros (\texttt{AltruistGene}) con la configuraci\'on por defecto (\texttt{default\_config}),
-el gen altruista desaparece de la poblaci\'on con rapidez (Figura~\ref{fig:p2}).
-La frecuencia del gen altruista cae desde el $\approx$50\,\% inicial hasta pr\'acticamente cero en torno a la generaci\'on 50,
-tras lo cual la poblaci\'on queda compuesta exclusivamente por cobardes y su din\'amica reproduce la de la Prueba~1.
-El altruista puro avisa a todos los individuos del \'arbol, incluyendo cobardes, que se benefician del aviso sin asumir ning\'un coste,
-lo que confiere a los cobardes una aptitud relativa superior.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig02_exp2_genes_run1.png}
-        \caption{Distribuci\'on gen\'etica por generaci\'on.}
-        \label{fig:p2-genes}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig03_exp2_pop_run1.png}
-        \caption{Din\'amica poblacional.}
-        \label{fig:p2-pop}
-    \end{subfigure}
-    \caption{Prueba~2 (\texttt{Experiment2}, \texttt{default\_config}, 1 ejecuci\'on, $p_\text{escape}=0{,}50$).}
-    \label{fig:p2}
-\end{figure}
-
-\subsection{Prueba 3: altruismo puro con alta probabilidad de escape ($p_\text{escape}=0{,}90$)}
-
-Aumentar $p_\text{escape}$ al 90\,\% (\texttt{high\_escape\_prob}) produce un resultado llamativo en esta ejecuci\'{o}n
-individual (Figura~\ref{fig:p3}): lejos de seguir el patr\'{o}n de la Prueba~2, la frecuencia del
-altruista oscila err\'{a}ticamente durante las primeras $\sim$70 generaciones, alternando entre dominio
-de cobardes y repuntes del altruista, lo que sugiere inestabilidad din\'{a}mica.A partir de la
-generaci\'{o}n~70 el altruista comienza a imponerse de forma sostenida y alrededor de la
-generaci\'{o}n~110 los cobardes se extinguen; el altruista termina fij\'{a}ndose en el 100\,\% de la
-poblaci\'{o}n. Este resultado contrasta radicalmente con la Prueba~2 y plantea la pregunta de si,
-con $p_\text{escape}$ suficientemente alto, el altruismo puro puede imponerse de forma general,
-o si la victoria del altruista en esta ejecuci\'{o}n es un mero efecto del azar.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig04_exp3_genes_run1.png}
-        \caption{Distribuci\'on gen\'etica por generaci\'on.}
-        \label{fig:p3-genes}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig05_exp3_pop_run1.png}
-        \caption{Din\'amica poblacional.}
-        \label{fig:p3-pop}
-    \end{subfigure}
-    \caption{Prueba~3 (\texttt{Experiment2}, \texttt{high\_escape\_prob}, 1 ejecuci\'on, $p_\text{escape}=0{,}90$).}
-    \label{fig:p3}
-\end{figure}
-
-\subsection{Prueba 4: verificaci\'on estad\'istica con 30 repeticiones ($p_\text{escape}=0{,}90$)}
-
-Para determinar si la victoria del altruista observada en la Prueba~3 constituye el comportamiento
-general o es un resultado puntual debido al azar, se replic\'{o} la misma condici\'{o}n exacta 30 veces.
-La Figura~\ref{fig:p4} muestra la evoluci\'{o}n gen\'{e}tica agregada (media de los 30 runs).
-El gen altruista decrece de forma sostenida desde el 50\,\% inicial hasta situarse en torno al
-15--20\,\% al cabo de apenas 100 generaciones, sin que la media de los 30 runs muestre ning\'un repunte
-ni tendencia hacia la fijaci\'on. La victoria del altruista observada en la Prueba~3 es por tanto
-un resultado excepcional producto de la estocasticidad del modelo, no el comportamiento general:
-promediando las trayectorias, el altruismo puro est\'a destinado a desaparecer incluso con
-$p_\text{escape}=0{,}90$.
-El tama\~no de la poblaci\'on (Figura~\ref{fig:p4-pop}) permanece estable y equivalente al de la Prueba~1.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig06_exp4_genes_agg.png}
-        \caption{Evoluci\'on gen\'etica agregada (30 runs).}
-        \label{fig:p4-genes}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig07_exp4_pop_agg.png}
-        \caption{Poblaci\'on agregada (30 runs).}
-        \label{fig:p4-pop}
-    \end{subfigure}
-    \caption{Prueba~4 (\texttt{Experiment2}, \texttt{high\_escape\_prob}, 30 repeticiones, $p_\text{escape}=0{,}90$).}
-    \label{fig:p4}
-\end{figure}
-
-\subsection{Prueba 5: altruismo selectivo con se\~nal de barba verde}
-
-Esta prueba estudia la viabilidad del \texttt{GreenBeardAltruistGene} bajo seis condiciones, resultado de cruzar
-tres valores de $p_\text{escape}$ (0{,}10 / 0{,}50 / 0{,}90) con dos proporciones iniciales de altruistas:
-50\,\% (mayoritaria) y 10\,\% (minoritaria), siendo el resto de la poblaci\'on cobardes puros en ambos casos.
-En todo momento la se\~nal de barba verde y el comportamiento altruista van acoplados: no existen individuos
-cobardes con barba verde.
-
-\subsubsection*{Proporci\'on inicial del 50\,\% de altruistas selectivos}
-
-Con la mitad de la poblaci\'on inicial compuesta por altruistas selectivos, el \texttt{GreenBeardAltruistGene}
-se fija en la poblaci\'on en pocas generaciones bajo las tres probabilidades de escape (Figura~\ref{fig:p5-nogb}).
-A $p_\text{escape}=0{,}50$ la fijaci\'on resulta evidente, pr\'acticamente extinguiendo a los cobardes
-en el transcurso de 100 d\'ias; a $p_\text{escape}=0{,}10$ la ventaja de los altruistas es mucho menor,
-y los datos reflejan esto mostrando un crecimiento mucho m\'as lento del altruista, aunque sostenido; y
-a $p_\text{escape}=0{,}90$ el altruista se impone con rapidez, extinguiendo a los cobardes en 100 generaciones.
-El altruismo selectivo elimina el coste de cooperar
-con cobardes al avisar \'unicamente a otros portadores de la se\~nal, generando una ventaja que supera a la
-cobard\'ia con independencia del coste individual del altruismo.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig08_exp5_nogb_default.png}
-        \caption{$p_\text{escape}=0{,}50$}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig09_exp5_nogb_low.png}
-        \caption{$p_\text{escape}=0{,}10$}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig10_exp5_nogb_high.png}
-        \caption{$p_\text{escape}=0{,}90$}
-    \end{subfigure}
-    \caption{Prueba~5, proporci\'on inicial del 50\,\% de altruistas selectivos (30 runs c/u).
-    El gen \texttt{GreenBeardAltruistGene} se fija en la poblaci\'on en todos los casos.}
-    \label{fig:p5-nogb}
-\end{figure}
-
-\subsubsection*{Proporci\'on inicial del 10\,\% de altruistas selectivos}
-
-Reducir la presencia inicial del altruista al 10\,\% altera sustancialmente los resultados (Figura~\ref{fig:p5-gb}).
-A $p_\text{escape}=0{,}10$ el gen cobarde domina completamente y el altruista selectivo aunque no desaparece en todas las ejecuciones,
-s\'i se puede observar c\'omo la mayoria de las trayectorias se extinguen relativamente r\'apido, y las que persisten
-muestran una evoluci\'on err\'atica con oscilaciones pronunciadas, sin tendencia clara hacia la fijaci\'on.
-A $p_\text{escape}=0{,}50$ se observa c\'omo en la mayor\'ia de las ejecuciones se extingue el altruista si su poblaci\'on no crece
-lo suficiente alrededor de los primeros 50 d\'ias, pero en las ejecuciones donde el altruista logra superar esa fase inicial de 
-vulnerabilidad, se impone con rapidez superando a los cobardes y fij\'andose en la poblaci\'on.
-A $p_\text{escape}=0{,}90$ se puede observar c\'omo en alrededor de la mitad de las ejecuciones se extingue el altruista en la 
-fase inicial, pero en la otra mitad el altruista logra superar esa fase y se impone con rapidez, fij\'andose en la poblaci\'on.
-Estos resultados muestran que la viabilidad del altruismo selectivo depende conjuntamente de la probabilidad que tienen
-de escapar de los depredadores ($p_\text{escape}$) y de la proporci\'on inicial: a coste individual bajo, el
-altruista puede prosperar incluso desde una posici\'on minoritaria; pero a coste alto, la masa cr\'itica inicial resulta determinante.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig11_exp5_gb_default.png}
-        \caption{$p_\text{escape}=0{,}50$}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig12_exp5_gb_low.png}
-        \caption{$p_\text{escape}=0{,}10$}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig13_exp5_gb_high.png}
-        \caption{$p_\text{escape}=0{,}90$}
-    \end{subfigure}
-    \caption{Prueba~5, proporci\'on inicial del 10\,\% de altruistas selectivos (30 runs c/u).
-    La viabilidad del gen altruista depende del coste individual ($p_\text{escape}$).}
-    \label{fig:p5-gb}
-\end{figure}
-
-\subsubsection*{Curiosidad: din\'amica de poblaci\'on con 10\,\% inicial de altruistas}
-
-Como complemento descriptivo, la Figura~\ref{fig:p5-gb-pop} muestra la evoluci\'on del tama\~no
-poblacional agregado (media y dispersi\'on entre runs) para el mismo bloque de comparaciones de la
-Figura~\ref{fig:p5-gb}, es decir, manteniendo 10\,\% de altruistas selectivos iniciales y variando
-\(p_\text{escape}\).
-Se aprecia que con $p_\text{escape}=0{,}90$ la poblaci\'on media total presenta una tendencia ascendente
-m\'as marcada a lo largo de las generaciones, mientras que en $p_\text{escape}=0{,}10$ y
-$p_\text{escape}=0{,}50$ la evoluci\'on es m\'as plana y con menor incremento neto.
-Esto se debe a que, al haber m\'as ejecuciones donde el altruista logra imponerse a los cobardes, 
-el beneficio mutuo entre altruistas se traduce en una mayor supervivencia y reproducci\'on, 
-lo que impulsa un crecimiento poblacional m\'as pronunciado. En contraste, con $p_\text{escape}=0{,}10$ 
-la mayor parte de las ejecuciones terminan dominadas por cobardes, lo que limita el crecimiento poblacional 
-y mantiene una din\'amica m\'as estable.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig16_exp5_pop_low_10pct.png}
-        \caption{$p_\text{escape}=0{,}10$}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig17_exp5_pop_default_10pct.png}
-        \caption{$p_\text{escape}=0{,}50$}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \includegraphics[width=\textwidth]{fig18_exp5_pop_high_10pct.png}
-        \caption{$p_\text{escape}=0{,}90$}
-    \end{subfigure}
-    \caption{Din\'amica poblacional agregada en Prueba~5 con 10\,\% inicial de altruistas selectivos (30 runs c/u).
-    A mayor $p_\text{escape}$ se observa un incremento m\'as claro de la poblaci\'on media final.}
-    \label{fig:p5-gb-pop}
-\end{figure}
-
-\subsection{Prueba 6: separaci\'on de la se\~nal y del comportamiento altruista}
-
-La Prueba~6 desacopla expl\'icitamente la se\~nal de barba verde del comportamiento altruista mediante \texttt{Experiment4},
-donde \texttt{GreenBeardGene} y \texttt{SelectiveAltruistGene} coexisten como genes separados junto con \texttt{GreenBeardAltruistGene} y \texttt{CowardGene} (25\,\% cada uno, 400 generaciones).
-La Figura~\ref{fig:p6} muestra que tanto \texttt{SelectiveAltruistGene} como \texttt{GreenBeardAltruistGene} desaparecen antes de la generaci\'on 50,
-mientras que la poblaci\'on converge a un equilibrio entre cobarde puro ($\approx$55\,\%) y cobarde con barba verde ($\approx$45\,\%).
-La barba verde pierde toda utilidad como se\~nal de reconocimiento al no garantizar el comportamiento cooperativo:
-los altruistas que la usan como criterio de selecci\'on acaban cooperando con cobardes barbudos, pagando un coste sin obtener beneficio.
-El tama\~no de la poblaci\'on (Figura~\ref{fig:p6-pop}) permanece estable en todos los casos, igual que en pruebas anteriores.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig14_exp6_genes_agg.png}
-        \caption{Evoluci\'on gen\'etica agregada (30 runs, 400 generaciones).}
-        \label{fig:p6-genes}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig15_exp6_pop_agg.png}
-        \caption{Poblaci\'on agregada (30 runs, 400 generaciones).}
-        \label{fig:p6-pop}
-    \end{subfigure}
-    \caption{Prueba~6 (\texttt{Experiment4}, \texttt{default\_config}, 30 repeticiones).
-    Las estrategias altruistas se extinguen antes de la generaci\'on 50.}
-    \label{fig:p6}
-\end{figure}
-
-\section{Discusi\'on}
-
-\subsection{Inestabilidad evolutiva del altruismo puro}
-
-Las Pruebas~2, 3 y 4 demuestran que el altruismo puro (\texttt{AltruistGene}) es evolutivamente inestable cuando compite con la cobard\'ia,
-con independencia de la probabilidad de escape del altruista.
-El altruista puro avisa a todos los individuos de su \'arbol, incluyendo cobardes, que obtienen el beneficio del aviso sin asumir ning\'un coste.
-Esto confiere a los cobardes una aptitud relativa superior y desplaza al altruista de la poblaci\'on,
-en plena concordancia con la teor\'ia de la selecci\'on individual~\cite{hamilton1964}.
-Aumentar $p_\text{escape}$ al 90\,\% (Prueba~3 y~4) solo ralentiza el proceso sin revertirlo.
-
-\subsection{Efectividad del altruismo selectivo con se\~nal de barba verde}
-
-Cuando la se\~nal de barba verde est\'a acoplada al comportamiento altruista y no existen explotadores de la se\~nal,
-el altruismo selectivo es capaz de invadir y fijar una poblaci\'on mayoritariamente cobarde (Prueba~5, sin barba verde adicional).
-Esto ocurre porque el \texttt{GreenBeardAltruistGene} dirige el coste del altruismo exclusivamente hacia otros portadores de la se\~nal,
-que a su vez tambi\'en son altruistas; el beneficio mutuo genera una ventaja de aptitud sobre los cobardes.
-Este resultado reproduce el mecanismo de la barba verde de Dawkins~\cite{dawkins1976} en un contexto computacional.
-
-\subsection{Influencia de la proporci\'on inicial y del coste individual sobre el altruismo selectivo}
-
-La Prueba~5 revela que la viabilidad del altruismo selectivo no s\'olo depende del mecanismo de reconocimiento,
-sino de la interacci\'on entre la proporci\'on inicial de altruistas y el coste individual del comportamiento
-($p_\text{escape}$).
-Cuando los altruistas parten de una posici\'on mayoritaria (50\,\%), el gen se fija con independencia de
-$p_\text{escape}$: la masa cr\'itica inicial es suficiente para que la cooperaci\'on selectiva genere
-un beneficio neto superior a la cobard\'ia en cualquier escenario de coste.
-Sin embargo, cuando parten de una minor\'ia (10\,\%), el resultado depende fuertemente de $p_\text{escape}$:
-a coste alto (0{,}10) el altruista se extingue porque la escasez de portadores de la se\~nal hace que
-cada encuentro altruista sea m\'as frecuentemente con un cobarde que con otro altruista,
-mientras que a coste bajo (0{,}90) el altruista logra mantenerse en equilibrio estable.
-Este resultado ilustra la importancia del efecto de masa cr\'itica en la evoluci\'on de la cooperaci\'on:
-una estrategia cooperativa puede ser localmente estable por encima de cierto umbral de frecuencia
-pero vulnerable a la extinci\'on si parte de una proporci\'on demasiado reducida~\cite{hamilton1964}.
-
-La desactivaci\'on total del acoplamiento entre se\~nal y comportamiento (Prueba~6) produce el colapso
-irreversible de ambas estrategias altruistas antes de la generaci\'on 50, confirmando que el mecanismo
-de barba verde s\'olo es evolutivamente estable cuando la se\~nal implica de forma fiable el comportamiento
-cooperativo~\cite{zahavi1975}.
+Los experimentos 8 y 9 revelan una tensi\'on entre la ventaja colectiva de la sociabilidad y el riesgo de convertirse en objetivo preferido. El gen \texttt{SocialGreenBeardAltruistGene} (Exp.~8) aprovecha el efecto de ``muchos ojos'': en un grupo de $N$ herb\'ivoros con probabilidad individual de detecci\'on $p$, la probabilidad de que al menos uno detecte al depredador es $1-(1-p)^N$, proporcionando una ventaja de vigilancia colectiva creciente con el tama\~no del grupo. Sin embargo, el Exp.~9 revela que esta ventaja puede invertirse: los depredadores con \texttt{AmbushCamoGene} eligen preferentemente los \'arboles con m\'as herb\'ivoros, anulando parcialmente el beneficio de la agrupaci\'on. Ante esta presi\'on selectiva, la estrategia solitaria--cobarde (\texttt{SolitaryCowardGene}) ---que evita los \'arboles ya ocupados--- reduce la exposici\'on al depredador grupal, favoreciendo su dominancia a largo plazo.
 
 \subsection{Robustez del tama\~no poblacional}
 
-Una observaci\'on transversal a todas las pruebas es que la composici\'on gen\'etica determina la \textit{estructura} de la poblaci\'on (qu\'e estrategia domina) pero no su \textit{tama\~no}.
-En todos los escenarios la poblaci\'on oscila en un rango similar al de la Prueba~1, determinado fundamentalmente por la capacidad del entorno (25 \'arboles) y la tasa reproductiva (1--2 cr\'ias por superviviente).
+Una observaci\'on transversal a todos los experimentos es que la composici\'on gen\'etica determina la \textit{estructura} de la poblaci\'on (qu\'e estrategia domina), pero no su \textit{tama\~no}. En todos los escenarios la abundancia oscila en rangos similares, determinada fundamentalmente por los par\'ametros ecol\'ogicos del entorno: capacidad de los \'arboles, tasa reproductiva y probabilidad de depredaci\'on por \'arbol, no por la identidad del gen dominante.
 
 \section{Conclusiones}
 
 \begin{enumerate}
-    \item El altruismo puro no es evolutivamente estable en el modelo implementado:
-    desaparece de la poblaci\'on independientemente de la probabilidad de escape del altruista (Pruebas 2--4).
-    
-    \item El altruismo selectivo mediado por la se\~nal de barba verde puede fijarse en la poblaci\'on cuando los altruistas parten de una proporci\'on inicial mayoritaria (50\,\%), con independencia del coste individual del altruismo (Prueba~5).
-    
-    \item Cuando los altruistas parten de una proporci\'on inicial reducida (10\,\%), la viabilidad del mecanismo depende del coste individual: a $p_\text{escape}$ baja, el gen altruista se extingue; a $p_\text{escape}$ alta, persiste en un equilibrio estable (Prueba~5). Esto sugiere la existencia de un umbral de masa cr\'itica por debajo del cual el altruismo selectivo no puede prosperar.
-    
-    \item Cuando la se\~nal y el comportamiento altruista se desacoplan como genes independientes, ambas estrategias altruistas (\texttt{GreenBeardAltruistGene} y \texttt{SelectiveAltruistGene}) se extinguen antes de la generaci\'on 50 y la poblaci\'on converge a cobardes puros o barbudos (Prueba 6).
-    
-    \item El tama\~no de la poblaci\'on es robusto frente a la composici\'on gen\'etica y queda determinado por los par\'ametros ecol\'ogicos del entorno.
+    \item El altruismo puro no es evolutivamente estable: los cobardes explotan el aviso colectivo sin asumir coste, desplazando sistem\'aticamente al altruista, independientemente de su probabilidad de escape (Exp.~1--4).
+
+    \item El altruismo selectivo con barba verde puede fijarse cuando se\~nal y comportamiento est\'an acoplados, pero exhibe dependencia de masa cr\'itica: una proporci\'on inicial reducida de altruistas puede resultar en extinci\'on si el coste individual es alto (Exp.~3).
+
+    \item El desacoplamiento entre se\~nal y conducta altruista colapsa ambas estrategias en menos de 50 generaciones, confirmando que la estabilidad del mecanismo de barba verde requiere fiabilidad de la se\~nal~\cite{zahavi1975} (Exp.~4).
+
+    \item El camuflaje en depredadores produce suicidio evolutivo: la mayor eficiencia depredadora depleta la presa y conduce a la extinci\'on del propio depredador (Exp.~6--9).
+
+    \item La ventaja colectiva de ``muchos ojos'' puede invertirse cuando depredadores especializados dirigen su atenci\'on a los grupos m\'as numerosos, favoreciendo estrategias solitarias--cobardes (Exp.~9).
+
+    \item El tama\~no de la poblaci\'on est\'a determinado por los par\'ametros ecol\'ogicos del entorno, no por la composici\'on gen\'etica (observaci\'on transversal a los nueve experimentos).
 \end{enumerate}
 
 \medskip
-Los resultados obtenidos sugieren que la evoluci\'on del altruismo requiere mecanismos de reconocimiento que sean dif\'iciles de falsificar
----como el parentesco gen\'etico real o la reciprocidad en interacciones repetidas---,
+Los resultados obtenidos sugieren que la evoluci\'on del altruismo requiere mecanismos de reconocimiento dif\'iciles de falsificar
+---como el parentesco gen\'etico o la reciprocidad en interacciones repetidas---,
 ninguno de los cuales ha sido modelado en el presente trabajo y constituye una l\'inea natural de extensi\'on futura.
+La evoluci\'on de estrategias depredadoras merece profundizaci\'on adicional: la eficiencia depredadora excesiva resulta maladaptativa
+a escala de poblaci\'on, un resultado con implicaciones para modelos de gesti\'on de ecosistemas.
 
 \begin{thebibliography}{9}
 \bibitem{hamilton1964}
@@ -682,219 +556,3 @@ ninguno de los cuales ha sido modelado en el presente trabajo y constituye una l
 \end{thebibliography}
 
 \end{document}
-
-\subsubsection*{Variante A: $p_\text{escape}=0{,}50$}
-
-Con una probabilidad de escape del altruista del 50\,\%, el gen altruista desaparece con rapidez de la poblaci\'on.
-La Figura~\ref{fig:exp2-genes} muestra c\'omo la frecuencia del gen altruista cae de un valor inicial del 52\,\% hasta pr\'acticamente cero en torno a la generaci\'on 50, tras lo cual la poblaci\'on queda compuesta exclusivamente por cobardes.
-La din\'amica poblacional (Figura~\ref{fig:exp2-pop}) es comparable a la del Experimento 1 tras la fijaci\'on del gen cobarde,
-con supervivientes estables en torno a 40--45 individuos por generaci\'on.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig2_exp2_genes_run1.png}
-        \caption{Distribuci\'on de genes por generaci\'on (1 ejecuci\'on, $p_\text{escape}=0{,}50$).}
-        \label{fig:exp2-genes}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig3_exp2_population_run1.png}
-        \caption{Din\'amica poblacional por generaci\'on (1 ejecuci\'on, $p_\text{escape}=0{,}50$).}
-        \label{fig:exp2-pop}
-    \end{subfigure}
-    \caption{Experimento 2, Variante A: cobard\'ia frente a altruismo puro con $p_\text{escape}=0{,}50$.}
-\end{figure}
-
-\subsubsection*{Variante B: $p_\text{escape}=0{,}90$ (30 repeticiones, 200 generaciones)}
-
-Incluso al aumentar la probabilidad de escape del altruista hasta el 90\,\%, el gen altruista no logra establecerse en la poblaci\'on.
-Como muestra la Figura~\ref{fig:exp2-agg-genes}, la frecuencia media del gen altruista desciende de forma mon\'otona desde el 50\,\% inicial
-hasta situarse en torno al 15\,\%--20\,\% al final de las 200 generaciones.
-La variabilidad entre ejecuciones es considerable en las primeras generaciones pero se reduce progresivamente.
-La din\'amica poblacional agregada (Figura~\ref{fig:exp2-agg-pop}) permanece estable con una media de la poblaci\'on final de
-aproximadamente 65 individuos y una desviaci\'on est\'andar de $\pm$3--5, lo que indica que la composici\'on gen\'etica no afecta significativamente al tama\~no total de la poblaci\'on.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig4_exp2_genes_agg_high.png}
-        \caption{Distribuci\'on gen\'etica agregada (30 runs, $p_\text{escape}=0{,}90$).}
-        \label{fig:exp2-agg-genes}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig5_exp2_pop_agg_high.png}
-        \caption{Poblaci\'on final agregada (30 runs, $p_\text{escape}=0{,}90$).}
-        \label{fig:exp2-agg-pop}
-    \end{subfigure}
-    \caption{Experimento 2, Variante B: cobard\'ia frente a altruismo puro con $p_\text{escape}=0{,}90$, 30 repeticiones.}
-\end{figure}
-
-\subsection{Experimento 3: cobard\'ia frente a altruismo selectivo con se\~nal de parentesco}
-
-\subsubsection*{Variante A: $p_\text{escape}=0{,}50$, sin barba verde en la poblaci\'on cobarde}
-
-La introducci\'on de la se\~nal de barba verde como mecanismo de reconocimiento alter\'o dr\'asticamente la din\'amica evolutiva.
-Partiendo de una frecuencia inicial del \texttt{GreenBeardAltruistGene} del 10\,\%, este gen se fija en la poblaci\'on en pocas generaciones.
-La Figura~\ref{fig:exp3-default} muestra c\'omo en torno a la generaci\'on 5--10 el gen altruista con barba verde ya supera el 90\,\% de la poblaci\'on,
-alcanzando la cuasi-fijaci\'on (frecuencia $>$95\,\%) antes de la generaci\'on 40.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.75\textwidth]{fig6_exp3_genes_agg_default.png}
-    \caption{Experimento 3, Variante A: distribuci\'on gen\'etica agregada (30 runs, $p_\text{escape}=0{,}50$).
-    El gen \texttt{green\_beard\_altruist} alcanza la cuasi-fijaci\'on en pocas generaciones.}
-    \label{fig:exp3-default}
-\end{figure}
-
-\subsubsection*{Variante B: $p_\text{escape}=0{,}10$, con 10\,\% de barba verde en la poblaci\'on cobarde}
-
-Reducir la probabilidad de escape del altruista al 10\,\% e introducir barba verde en el 10\,\% inicial de los cobardes invierte completamente el resultado.
-Como se aprecia en la Figura~\ref{fig:exp3-low}, el gen cobarde domina desde el inicio y se mantiene con una frecuencia superior al 90\,\% durante todo el experimento.
-La presencia de individuos cobardes portadores de la se\~nal (barba verde sin altruismo) neutraliza el beneficio del reconocimiento,
-ya que los altruistas que avisan a cobardes barbudos no reciben reciprocidad, pagando el coste del altruismo sin obtener beneficio.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.75\textwidth]{fig7_exp3_genes_agg_low.png}
-    \caption{Experimento 3, Variante B: distribuci\'on gen\'etica agregada (30 runs, $p_\text{escape}=0{,}10$,
-    con 10\,\% de barba verde en cobardes). El gen cobarde domina durante todo el experimento.}
-    \label{fig:exp3-low}
-\end{figure}
-
-\subsubsection*{Variante C: $p_\text{escape}=0{,}90$, con 10\,\% de barba verde en la poblaci\'on cobarde}
-
-Con una probabilidad de escape del 90\,\% e individuos cobardes con barba verde, se observa un equilibrio intermedio.
-La Figura~\ref{fig:exp3-high} muestra que el gen cobarde converge a una frecuencia estable en torno al 70\,\%,
-mientras que el altruista con barba verde se mantiene en aproximadamente el 30\,\%.
-En este escenario, el coste de avisar a cobardes barbudos queda parcialmente compensado por la alta probabilidad de escape del propio altruista,
-lo que le permite persistir en la poblaci\'on como estrategia minoritaria.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.75\textwidth]{fig8_exp3_genes_agg_high.png}
-    \caption{Experimento 3, Variante C: distribuci\'on gen\'etica agregada (30 runs, $p_\text{escape}=0{,}90$,
-    con 10\,\% de barba verde en cobardes). Convergencia a un equilibrio cobarde--altruista en torno a 70--30\,\%.}
-    \label{fig:exp3-high}
-\end{figure}
-
-\subsection{Experimento 4: competici\'on de cuatro estrategias}
-
-El experimento de cuatro fenotipos proporciona el escenario m\'as complejo y revela la vulnerabilidad de las estrategias altruistas ante la presencia de individuos que explotan la se\~nal sin cooperar.
-La Figura~\ref{fig:exp4-genes} muestra que tanto el \texttt{SelectiveAltruistGene} como el \texttt{GreenBeardAltruistGene} desaparecen de la poblaci\'on antes de las primeras 50 generaciones,
-mientras que el fenotipo \texttt{GreenBeard}+\texttt{Coward} y el cobarde puro dominan el resto de la simulaci\'on.
-A partir de la generaci\'on 50, la poblaci\'on converge a un equilibrio entre el cobarde puro ($\approx$55\,\%) y el cobarde portador de barba verde ($\approx$45\,\%),
-que se mantiene estable hasta la generaci\'on 400.
-
-La din\'amica poblacional (Figura~\ref{fig:exp4-pop}) no muestra diferencias sustanciales respecto a los experimentos anteriores:
-la poblaci\'on media al final de cada generaci\'on oscila entre 62 y 68 individuos con una desviaci\'on est\'andar de $\pm$4--5,
-confirmando que la composici\'on gen\'etica incide sobre la estructura de la poblaci\'on pero no sobre su tama\~no global.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig9_exp4_genes_agg.png}
-        \caption{Distribuci\'on gen\'etica agregada (30 runs, 400 generaciones).}
-        \label{fig:exp4-genes}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.49\textwidth}
-        \includegraphics[width=\textwidth]{fig10_exp4_pop_agg.png}
-        \caption{Poblaci\'on final agregada (30 runs, 400 generaciones).}
-        \label{fig:exp4-pop}
-    \end{subfigure}
-    \caption{Experimento 4: competici\'on de cuatro estrategias, 30 repeticiones.
-    Las estrategias altruistas desaparecen antes de la generaci\'on 50.}
-\end{figure}
-
-\section{Discusi\'on}
-
-\subsection{Inestabilidad evolutiva del altruismo puro}
-
-Los resultados del Experimento~2 reflejan el problema cl\'asico del altruismo en biolog\'ia evolutiva:
-una estrategia altruista que beneficia a individuos no emparentados (sin mecanismo de reconocimiento) resulta evolutivamente inestable cuando compite con estrategias ego\'istas~\cite{hamilton1964}.
-En el modelo implementado, el altruista puro avisa a todos los individuos de su \'arbol, incurriendo en un coste personal (probabilidad de ser comido)
-para beneficiar tambi\'en a cobardes. Dado que los cobardes obtienen el beneficio de la alerta sin reciprocar, su aptitud relativa es mayor y se imponen.
-La Prueba~3 muestra que una sola ejecuci\'{o}n con $p_\text{escape}=0{,}90$ puede, por efecto del azar,
-dar lugar a la victoria completa del altruista; sin embargo, la Prueba~4 demuestra que este resultado
-es excepcional: promediando 30 repeticiones, el gen altruista declina de forma sostenida y no se fija.
-Este resultado es coherente con la predicci\'on de Hamilton~\cite{hamilton1964}: el altruismo no dirigido no puede mantenerse si la selecci\'on opera sobre individuos no emparentados.
-
-\subsection{El efecto de la se\~nal de reconocimiento (barba verde)}
-
-El mecanismo de barba verde (\textit{green beard}), introducido en el Experimento~3, demuestra ser altamente efectivo bajo ciertas condiciones.
-Cuando la se\~nal est\'a acoplada funcionalmente al comportamiento altruista (solo los individuos altruistas portan la barba),
-el gen \texttt{GreenBeardAltruistGene} es capaz de invadir y fijar una poblaci\'on mayoritariamente cobarde en pocas generaciones (Variante~A).
-Esto ocurre porque el altruismo selectivo elimina el coste de cooperar con individuos que no reciprocan:
-al avisar \'unicamente a otros portadores de barba verde, el altruista maximiza el beneficio del comportamiento cooperativo.
-
-Sin embargo, la Variante~B del Experimento~3 pone de manifiesto la fragilidad de este mecanismo:
-basta con que el 10\,\% inicial de la poblaci\'on cobarde porte tambi\'en la se\~nal para que el equilibrio se invierta completamente.
-Los altruistas que avisan a cobardes barbudos asumen el riesgo de depredaci\'on sin obtener ning\'un beneficio de esos individuos,
-lo que reduce dr\'asticamente su aptitud. Este fen\'omeno constituye un caso de explotaci\'on de la se\~nal o \textit{cheating}~\cite{dawkins1976},
-y su efecto depende cr\'iticamente de $p_\text{escape}$: solo con una probabilidad muy alta (Variante~C, 90\,\%)
-los altruistas logran coexistir con los cobardes barbudos, aunque no domin\'andolos.
-
-\subsection{Colapso de las estrategias altruistas ante la diversidad de se\~nales}
-
-El Experimento~4 extiende el an\'alisis al escenario de cuatro estrategias y confirma la predicci\'on del Experimento~3~(Variante~B).
-La presencia de individuos \texttt{GreenBeard+Coward} (portadores de la se\~nal sin el comportamiento asociado) supone una presi\'on selectiva fatal para ambas estrategias altruistas:
-el \texttt{GreenBeardAltruistGene} pierde rapidamente porque avisa a cobardes barbudos,
-y el \texttt{SelectiveAltruistGene} desaparece porque avisa a cualquier portador de barba verde sin distinguir si tambi\'en son altruistas.
-El resultado es la fijaci\'on de los cobardes como \'unica estrategia viable, con independencia de si portan o no la se\~nal de barba verde,
-cuya funci\'on pierde todo valor de reconocimiento.
-
-Este resultado ilustra el principio de que la estabilidad evolutiva de una se\~nal de parentesco requiere que la se\~nal sea fiel,
-es decir, que su presencia implique de forma confiable el comportamiento cooperativo~\cite{zahavi1975}.
-En cuanto la se\~nal puede desacoplarse del comportamiento (como ocurre con \texttt{GreenBeard+Coward}),
-su valor informativo colapsa y el altruismo asociado deja de ser una estrategia viable.
-
-\subsection{Estabilidad del tama\~no poblacional}
-
-Una observaci\'on transversal a todos los experimentos es que la composici\'on gen\'etica afecta a la \textit{estructura} (qui\'enes sobreviven)
-pero no al \textit{tama\~no} de la poblaci\'on.
-En todos los escenarios la poblaci\'on media al final de cada generaci\'on se sit\'ua entre 62 y 70 individuos con baja varianza ($\pm$5),
-lo que indica que el modelo alcanza r\'apidamente un equilibrio din\'amico determinado principalmente por la capacidad del entorno (25 \'arboles $\times$ 2 plazas = 50 plazas) y la tasa reproductiva (1--2 cr\'ias por superviviente).
-
-\section{Conclusiones}
-
-Las simulaciones realizadas permiten extraer las siguientes conclusiones:
-
-\begin{enumerate}
-    \item El altruismo puro (\texttt{AltruistGene}) no es una estrategia evolutivamente estable cuando compite con la cobard\'ia, independientemente de la probabilidad de escape del altruista.
-    El gen altruista desaparece en todas las ejecuciones del Experimento~2, coincidiendo con la teor\'ia de la selecci\'on individual.
-    
-    \item La se\~nal de reconocimiento (barba verde) puede hacer viable el altruismo selectivo si la se\~nal es un indicador fiable del comportamiento cooperativo.
-    En ausencia de explotadores de la se\~nal, el \texttt{GreenBeardAltruistGene} domina la poblaci\'on con rapidez.
-    
-    \item La presencia de individuos que portan la se\~nal sin el comportamiento asociado (\textit{cheaters}) destruye la efectividad del altruismo selectivo.
-    Una frecuencia inicial del 10\,\% de cobardes barbudos es suficiente para impedir la fijaci\'on del gen altruista cuando $p_\text{escape}=0{,}10$, y para reducir su frecuencia de equilibrio al 30\,\% cuando $p_\text{escape}=0{,}90$.
-    
-    \item En el escenario de cuatro estrategias, los cobardes portadores de la se\~nal actúan como par\'asitos sociales que aceleran la extinci\'on de ambos tipos de altruistas.
-    La poblaci\'on converge a un equilibrio entre cobarde puro y cobarde barbudo, ambos funcionalmente equivalentes.
-    
-    \item El tama\~no de la poblaci\'on es robusto frente a la composici\'on gen\'etica y queda determinado principalmente por los par\'ametros ecol\'ogicos (capacidad del entorno y tasa reproductiva).
-\end{enumerate}
-
-\medskip
-Estos resultados apuntan a que la evoluci\'on del altruismo requiere mecanismos robustos de reconocimiento que sean dif\'iciles de falsificar,
-como el parentesco gen\'etico real (selecci\'on de parentela) o la reciprocidad en interacciones repetidas,
-ninguno de los cuales ha sido modelado en el presente trabajo y constituye una direcci\'on natural de extensi\'on futura.
-
-\begin{thebibliography}{9}
-\bibitem{hamilton1964}
-    W.D. Hamilton, \textit{The genetical evolution of social behaviour I \& II},
-    Journal of Theoretical Biology, 7(1):1--52, 1964.
-
-\bibitem{dawkins1976}
-    R. Dawkins, \textit{The Selfish Gene},
-    Oxford University Press, Oxford, 1976.
-
-\bibitem{zahavi1975}
-    A. Zahavi, \textit{Mate selection---a selection for a handicap},
-    Journal of Theoretical Biology, 53(1):205--214, 1975.
-\end{thebibliography}
-
-\end{document}
-

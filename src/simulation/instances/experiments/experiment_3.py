@@ -1,41 +1,41 @@
-from simulation.core.genes import Gene, CowardGene, GreenBeardAltruistGene
-from simulation.core.creature import Creature
-from simulation.core.simulation import Experiment, SimulationConfig
-from simulation.core.world import World
+"""Experimento 3 — Altruismo selectivo con señal de barba verde.
 
-configuration = SimulationConfig(
-    num_generations=100,
-    initial_population=80,
-    predator_probability=0.30,
-    offspring_min=1,
-    offspring_max=2,
-    seed=42,
-)
+Barrido 2 fracciones × 3 valores de p_escape → 6 condiciones, 30 corridas c/u.
+"""
+from simulation.core import SimulationConfig, CowardGene, GreenBeardAltruistGene
+from simulation.analysis.runner import SimpleExperiment, RandomPredatorGene
 
-class Experiment3(Experiment):
-    """Pure cowardice vs selective altruism
+_predator_specs = [(lambda: [RandomPredatorGene()], 1.0)]
 
-    In this experiment, we start with a population of creatures that have either the CowardGene or the GreenBeardAltruistGene.
-    """
 
-    @property
-    def name(self) -> str:
-        return "Experiment 3: Pure Cowardice vs Selective Altruism"
+def _make(frac_altruist: float, p_escape: float) -> SimpleExperiment:
+    frac_coward = 1.0 - frac_altruist
+    label = f"{frac_altruist:.0%}"
+    return SimpleExperiment(
+        name=f"Exp 3 — GreenBeardAltruist vs Coward ({label} inicial, p_escape={p_escape})",
+        description=(
+            f"Fracción inicial de GreenBeardAltruistGene = {label}, "
+            f"altruist_escape_prob = {p_escape}."
+        ),
+        config=SimulationConfig(
+            num_trees=25, tree_capacity_min=2, tree_capacity_max=2,
+            num_generations=200, initial_population=80, initial_predators=8,
+            offspring_min=1, offspring_max=2,
+            predator_offspring_min=1, predator_offspring_max=2,
+            base_detection_prob=0.30, altruist_escape_prob=p_escape,
+            predator_hunt_capacity=1, seed=0,
+        ),
+        herbivore_specs=[
+            (lambda: [GreenBeardAltruistGene()], frac_altruist),
+            (lambda: [CowardGene()],             frac_coward),
+        ],
+        predator_specs=_predator_specs,
+    )
 
-    @property
-    def description(self) -> str:
-        return (
-            "All creatures carry either the CowardGene or the GreenBeardAltruistGene.\n"
-            "This experiment serves as a baseline for the effectiveness of cowardice and selective altruism as defense mechanisms against predation."
-        )
 
-    @property
-    def config(self) -> SimulationConfig:
-        return configuration
-
-    @property
-    def population_specs(self) -> list[tuple[callable, float]]:
-        return [
-            (lambda: [CowardGene()], 0.9),  # 50% CowardGene
-            (lambda: [GreenBeardAltruistGene()], 0.1),  # 50% GreenBeardAltruistGene
-        ]
+exp3_50_010 = _make(0.50, 0.10)
+exp3_50_050 = _make(0.50, 0.50)
+exp3_50_090 = _make(0.50, 0.90)
+exp3_10_010 = _make(0.10, 0.10)
+exp3_10_050 = _make(0.10, 0.50)
+exp3_10_090 = _make(0.10, 0.90)
