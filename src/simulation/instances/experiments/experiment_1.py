@@ -1,38 +1,35 @@
-from simulation.core.genes import CowardGene
-from simulation.core.simulation import Experiment, SimulationConfig
+"""Experimento 1 — Cobardía pura (línea base).
 
-configuration = SimulationConfig(
+Población homogénea de CowardGene.  Establece la dinámica de referencia
+bajo depredación aleatoria (RandomPredatorGene).
+"""
+from simulation.core import SimulationConfig, CowardGene
+from simulation.analysis.runner import SimpleExperiment, RandomPredatorGene
+
+_config = SimulationConfig(
+    num_trees=25,
+    tree_capacity_min=2,
+    tree_capacity_max=2,
     num_generations=100,
     initial_population=80,
-    predator_probability=0.30,
+    initial_predators=8,
     offspring_min=1,
     offspring_max=2,
+    predator_offspring_min=1,
+    predator_offspring_max=2,
+    base_detection_prob=0.30,
+    altruist_escape_prob=0.50,
+    predator_hunt_capacity=1,
     seed=42,
 )
 
-class Experiment1(Experiment):
-    """Pure cowardice
-
-    In this experiment, we start with a population of creatures that all have the CowardGene.
-    """
-
-    @property
-    def name(self) -> str:
-        return "Experiment 1: Pure Cowardice"
-
-    @property
-    def description(self) -> str:
-        return (
-            "All creatures carry the CowardGene, which allows them to escape predators with a certain probability.\n"
-            "This experiment serves as a baseline for the effectiveness of cowardice as a defense mechanism against predation."
-        )
-
-    @property
-    def config(self) -> SimulationConfig:
-        return configuration
-
-    @property
-    def herbivore_specs(self) -> list[tuple[callable, float]]:
-        return [
-            (lambda: [CowardGene()], 1.0),  # All creatures start with the CowardGene
-        ]
+exp1 = SimpleExperiment(
+    name="Experimento 1 — Cobardía pura",
+    description=(
+        "Población de referencia compuesta íntegramente por individuos portadores de CowardGene. "
+        "Establece la dinámica de equilibrio bajo una estrategia individualista sin cooperación."
+    ),
+    config=_config,
+    herbivore_specs=[(lambda: [CowardGene()], 1.0)],
+    predator_specs=[(lambda: [RandomPredatorGene()], 1.0)],
+)

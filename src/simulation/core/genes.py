@@ -595,6 +595,37 @@ class SolitaryCowardGene(Gene):
         return [notifier], []
 
 
+class CamouflageCowardGene(Gene):
+    """Fenotipo compuesto: cobarde + camuflado.
+
+    Combina el comportamiento cobarde (el detector huye solo) con camuflaje físico:
+    invisible para la selección de árbol del depredador y con 40 % de probabilidad
+    de evasión durante la caza.
+
+    Se usa como fenotipo único en los experimentos de camuflaje herbívoro para evitar
+    que el nombre ``coward`` se cuente dos veces cuando la población camuflada también
+    portaría ``CowardGene``.
+    """
+
+    name = "camouflage_coward"
+    PRIORITY = 10
+
+    def apply_physical_traits(self, creature: Creature) -> Dict[str, Any]:
+        return {
+            "hidden_from_predator": True,
+            "hunt_evasion": 0.4,
+        }
+
+    def predator_behavior(
+        self,
+        notifier: Herbivore,
+        assigned: List[Herbivore],
+        cfg: Any,
+        rng: random.Random,
+    ) -> Tuple[List[Herbivore], List[Herbivore]]:
+        return [notifier], []
+
+
 class AmbushCamoGene(Gene):
     """Depredador emboscador con camuflaje muy alto.
 

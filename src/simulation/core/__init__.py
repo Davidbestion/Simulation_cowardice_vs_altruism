@@ -15,6 +15,7 @@ from .genes import (
     GreedyHunterGene,
     SocialGreenBeardAltruistGene,
     SolitaryCowardGene,
+    CamouflageCowardGene,
     AmbushCamoGene,
     # Backward-compat aliases
     GreenBeardAltruistGene,
@@ -45,6 +46,7 @@ __all__ = [
     # Composite genes
     "SocialGreenBeardAltruistGene",
     "SolitaryCowardGene",
+    "CamouflageCowardGene",
     "AmbushCamoGene",
     # Aliases
     "GreenBeardAltruistGene",

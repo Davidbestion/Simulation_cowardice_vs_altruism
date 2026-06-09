@@ -1,47 +1,34 @@
-from simulation.core.genes import CowardGene, GreenBeardAltruistGene, GreenBeardGene, SelectiveAltruistGene
-from simulation.core.simulation import Experiment, SimulationConfig
+"""Experimento 4 — Cuatro estrategias desacopladas.
 
-configuration = SimulationConfig(
-    num_generations=100,
-    initial_population=80,
-    predator_probability=0.30,
-    offspring_min=1,
-    offspring_max=2,
-    seed=42,
+Compite cobardía pura, impostor (GreenBeard + CowardGene), altruismo selectivo
+sin señal y altruismo con señal integrada (GreenBeardAltruistGene).
+30 corridas, 400 generaciones.
+"""
+from simulation.core import (
+    SimulationConfig, CowardGene, GreenBeardGene,
+    SelectiveAltruistGene, GreenBeardAltruistGene,
 )
+from simulation.analysis.runner import SimpleExperiment, RandomPredatorGene
 
-class Experiment4(Experiment):
-    """Pure cowardice
-
-    In this experiment, we start with a population of creatures that all have the CowardGene.
-    """
-
-    @property
-    def name(self) -> str:
-        return "Experiment 1: Pure Cowardice"
-
-    @property
-    def description(self) -> str:
-        return (
-            "All creatures carry the CowardGene, which allows them to escape predators with a certain probability.\n"
-            "This experiment serves as a baseline for the effectiveness of cowardice as a defense mechanism against predation."
-        )
-
-    @property
-    def config(self) -> SimulationConfig:
-        return configuration
-
-    @property
-    def herbivore_specs(self) -> list[tuple[callable, float]]:
-        return [
-            (lambda: [GreenBeardAltruistGene()], 0.25),
-            (lambda: [GreenBeardGene(), CowardGene()], 0.25),
-            (lambda: [SelectiveAltruistGene()], 0.25),
-            (lambda: [CowardGene()], 0.25),
-        ]
-    
-    # Four population types:
-    # 1. Cowards
-    # 2. Selective Altruists (help only those with Green Beard)
-    # 3. Green Beard + Coward (have the green beard but also the coward gene)
-    # 4. Green Beard Altruists (have the green beard and help others with Green Beard)
+exp4 = SimpleExperiment(
+    name="Experimento 4 — Cuatro estrategias desacopladas",
+    description=(
+        "Competencia entre cobardía pura, señalización sin cooperación (impostor), "
+        "altruismo selectivo sin señal y altruismo con señal integrada."
+    ),
+    config=SimulationConfig(
+        num_trees=25, tree_capacity_min=2, tree_capacity_max=2,
+        num_generations=400, initial_population=80, initial_predators=8,
+        offspring_min=1, offspring_max=2,
+        predator_offspring_min=1, predator_offspring_max=2,
+        base_detection_prob=0.30, altruist_escape_prob=0.50,
+        predator_hunt_capacity=1, seed=0,
+    ),
+    herbivore_specs=[
+        (lambda: [CowardGene()],                          0.25),
+        (lambda: [GreenBeardGene(), CowardGene()],         0.25),
+        (lambda: [SelectiveAltruistGene()],                0.25),
+        (lambda: [GreenBeardAltruistGene()],               0.25),
+    ],
+    predator_specs=[(lambda: [RandomPredatorGene()], 1.0)],
+)
